@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.db
+*.jsonl
+latency_chart.png
+.DS_Store
+.coverage
+node_modules/
+.next/
