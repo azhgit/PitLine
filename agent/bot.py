@@ -59,18 +59,17 @@ def _vad_params_from_env() -> VADParams:
             overrides[field] = float(value)
     return VADParams(**overrides)
 
-# Day 1: real dispatch prompt with fixed urgency/specialty classification
-# rules (see doc/voice-agent-poc-plan.md) - the caller never gets asked to
-# self-classify, the agent decides from what they describe.
+# Day 1: real service-department prompt with fixed urgency classification
+# rules (see doc/pitline-plan.md and CONTEXT.md) - the caller never gets
+# asked to self-classify, the agent decides from what they describe. There's
+# no specialty choice for the agent to make: urgency alone picks the
+# technician pool (Master Technician only for urgent, Quick Service first
+# for non-urgent) - that's handled inside check_availability's DMS call, not
+# something the model needs to reason about.
 SYSTEM_INSTRUCTION = (
-    "You are the after-hours dispatch line for a plumbing and HVAC company. "
+    "You are the after-hours service department line for a car dealership. "
     "Keep every reply to one or two short sentences - this is a phone call, "
     "not a chat.\n\n"
-    "Before anything else: if the caller describes a gas leak or gas smell, "
-    "smoke, fire, or suspected carbon monoxide, that's a life-threatening "
-    "emergency, not a scheduling call. Don't classify it or check "
-    "availability - immediately call transfer_and_end_call with reason "
-    "'life_threatening_emergency'. This check overrides every rule below.\n\n"
     "If the caller wants to check, reschedule, or cancel an EXISTING "
     "appointment (not describing a new problem), call find_appointment "
     "first - it looks up the caller's own record automatically off the "
@@ -90,42 +89,47 @@ SYSTEM_INSTRUCTION = (
     "the change, then call end_call. Booking the new slot before "
     "cancelling the old one means they're never left with nothing if the "
     "new booking fails.\n\n"
-    "For every caller:\n"
-    "1. Ask what's wrong if they haven't said, then classify BOTH the "
-    "specialty and the urgency from their description. Use these fixed "
-    "rules, don't improvise:\n"
-    "   - specialty: 'plumbing' for water/pipe/drain/water-heater issues "
-    "(including no hot water), 'hvac' for heating/cooling/air issues.\n"
-    "   - urgency 'urgent': active water damage, no heat with near-freezing "
-    "outdoor temps, or sewage backup. (A gas leak/smell is the "
-    "life-threatening emergency handled above, not this classification.)\n"
-    "   - urgency 'non_urgent': a dripping faucet, no hot water, an unusual "
-    "noise, or routine maintenance.\n"
-    "   If what they said doesn't make sense or doesn't sound like a "
-    "plumbing/HVAC problem, ask them to repeat it once. If it's still "
-    "unclear the second time, call transfer_and_end_call with reason "
-    "'cannot_understand_caller' instead of continuing to guess.\n"
-    "2. Call check_availability with that specialty and urgency. If it "
-    "returns slots, read them back exactly as concrete options (e.g. "
-    "'Tuesday at 2pm with Mike, or Wednesday at 10am with Dana') - never "
-    "invent a time yourself. If it returns no slots:\n"
-    "   - urgent: call transfer_and_end_call with reason "
+    "For every caller describing a new problem:\n"
+    "1. Ask what's wrong with the vehicle if they haven't said, then "
+    "classify the urgency from their description. Use this fixed category "
+    "list, don't improvise:\n"
+    "   - urgency 'urgent': brake problems (grinding, a soft pedal, or a "
+    "warning light), steering or suspension failure, an active fluid leak, "
+    "overheating or smoke, or an airbag warning light.\n"
+    "   - urgency 'non_urgent': routine maintenance (oil change, tire "
+    "rotation, inspection), a non-dangerous noise, or an infotainment/"
+    "electrical nuisance - anything not on the urgent list above.\n"
+    "   If what they said doesn't make sense, ask them to repeat it once. "
+    "If it's still unclear the second time, call transfer_and_end_call "
+    "with reason 'cannot_understand_caller' instead of continuing to "
+    "guess.\n"
+    "2. Call check_availability with that urgency. Its result has 'slots' "
+    "and 'outside_window':\n"
+    "   - slots non-empty, outside_window false: read them back exactly as "
+    "concrete options (e.g. 'Tuesday at 2pm with Mike, or Wednesday at "
+    "10am with Dana') - never invent a time yourself. Continue to step 3.\n"
+    "   - slots non-empty, outside_window true: nothing's open in the next "
+    "week - tell the caller that, offer the one returned slot as the "
+    "nearest available time, and mention someone will call back sooner if "
+    "a cancellation opens up. Continue to step 3 only if they want that "
+    "slot; otherwise call end_call.\n"
+    "   - slots empty (only possible for urgent - non_urgent always finds "
+    "something): call transfer_and_end_call with reason "
     "'urgent_no_availability'.\n"
-    "   - non_urgent: tell them nothing's open in the next week, but "
-    "someone will call back as soon as a slot opens up, then call "
+    "3. Once the caller picks a slot, get their name, phone number, and "
+    "vehicle make/model/year, then read all of it back and get an explicit "
+    "yes before booking - STT can mishear a name, a digit, or a vehicle "
+    "detail and there'd be no other way to catch it. Only after they "
+    "confirm, call book_appointment with that exact slot, read back the "
+    "confirmed time and technician name to close the call, then call "
     "end_call.\n"
-    "3. Once the caller picks a slot, get their name and phone number, "
-    "then read both back and get an explicit yes before booking - "
-    "STT can mishear a name or a digit and there'd be no other way to "
-    "catch it. Only after they confirm, call book_appointment with that "
-    "exact slot, read back the confirmed time and technician name to "
-    "close the call, then call end_call.\n"
     "Call end_call right after any of these natural conclusions - don't "
     "just stop talking and wait for the caller to hang up.\n"
 )
 KICKOFF_MESSAGE = (
     "The caller just connected. Greet them in one short sentence as the "
-    "after-hours plumbing/HVAC dispatch line, then ask what's going on."
+    "dealership's after-hours service department line, then ask what's "
+    "going on with their vehicle."
 )
 
 
@@ -139,23 +143,22 @@ def build_tool_schemas() -> list[FunctionSchema]:
         FunctionSchema(
             name="check_availability",
             description=(
-                "Look up available appointment slots for a technician specialty "
-                "and urgency. Returns a short list of concrete slots to read back "
-                "to the caller verbatim."
+                "Look up available appointment slots for the given urgency. The "
+                "DMS picks the eligible technician pool itself (Master Technician "
+                "only for urgent, Quick Service first for non-urgent) - just pass "
+                "urgency, not a technician type. Returns 'slots' (a short list of "
+                "concrete slots to read back to the caller verbatim) and "
+                "'outside_window' (true if these slots are past the normal "
+                "one-week schedule - the Callback promise case)."
             ),
             properties={
-                "specialty": {
-                    "type": "string",
-                    "enum": ["plumbing", "hvac"],
-                    "description": "Which trade the issue falls under.",
-                },
                 "urgency": {
                     "type": "string",
                     "enum": ["urgent", "non_urgent"],
                     "description": "Urgency classified per the fixed dispatch rules.",
                 },
             },
-            required=["specialty", "urgency"],
+            required=["urgency"],
         ),
         FunctionSchema(
             name="book_appointment",
@@ -177,12 +180,24 @@ def build_tool_schemas() -> list[FunctionSchema]:
                 },
                 "customer_name": {"type": "string"},
                 "customer_phone": {"type": "string"},
+                "vehicle_make": {"type": "string"},
+                "vehicle_model": {"type": "string"},
+                "vehicle_year": {"type": "integer"},
                 "urgency": {
                     "type": "string",
                     "enum": ["urgent", "non_urgent"],
                 },
             },
-            required=["technician_id", "time_slot", "customer_name", "customer_phone", "urgency"],
+            required=[
+                "technician_id",
+                "time_slot",
+                "customer_name",
+                "customer_phone",
+                "vehicle_make",
+                "vehicle_model",
+                "vehicle_year",
+                "urgency",
+            ],
         ),
         FunctionSchema(
             name="find_appointment",
@@ -214,12 +229,10 @@ def build_tool_schemas() -> list[FunctionSchema]:
         FunctionSchema(
             name="transfer_and_end_call",
             description=(
-                "Speak a fixed line for the given reason, then end the call. "
-                "Covers both simulated transfers to a live dispatcher and telling "
-                "the caller to hang up and call 911 for a life-threatening "
-                "emergency - no real dialing or transfer happens either way. Use "
-                "this instead of continuing the conversation once one of the "
-                "listed situations applies."
+                "Speak a fixed line for the given reason, then end the call - "
+                "the Handoff simulation from CONTEXT.md. No real transfer "
+                "happens. Use this instead of continuing the conversation once "
+                "one of the listed situations applies."
             ),
             properties={
                 "reason": {
@@ -301,18 +314,17 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # ToolCallStartedFrame's docstring for why it's pushed here rather
         # than on every LLM turn.
         await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
-        specialty = params.arguments["specialty"]
         urgency = params.arguments["urgency"]
         try:
-            response = await dms_client.get(
-                "/availability", params={"specialty": specialty, "urgency": urgency}
-            )
+            response = await dms_client.get("/availability", params={"urgency": urgency})
             response.raise_for_status()
         except httpx.HTTPError as e:
             logger.error(f"DMS availability lookup failed: {e}")
             await params.result_callback({"error": "dms_unavailable"})
             return
-        await params.result_callback({"slots": response.json()})
+        # Already {"slots": [...], "outside_window": bool} - see
+        # dms/availability.py - passed straight through to the LLM.
+        await params.result_callback(response.json())
 
     async def book_appointment(params: FunctionCallParams):
         await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
@@ -329,6 +341,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     "time_slot": args["time_slot"],
                     "customer_name": args["customer_name"],
                     "customer_phone": args["customer_phone"],
+                    "vehicle_make": args["vehicle_make"],
+                    "vehicle_model": args["vehicle_model"],
+                    "vehicle_year": args["vehicle_year"],
                     "urgency": args["urgency"],
                 },
                 headers=headers,

@@ -1,18 +1,18 @@
+# Handoff simulation (CONTEXT.md): one scripted response - "connecting you to
+# our on-call service advisor now" - reused for every trigger, with a short
+# situation-specific lead-in. No real telephony transfer happens for any of
+# these.
 TRANSFER_MESSAGES = {
     "urgent_no_availability": (
-        "This sounds urgent, so I'm transferring you to our on-call technician now."
+        "This needs a Master Technician right away - connecting you to our "
+        "on-call service advisor now."
     ),
     "cannot_understand_caller": (
-        "I'm having trouble understanding you, so I'm transferring you to a live "
-        "dispatcher now."
-    ),
-    "life_threatening_emergency": (
-        "This is a life-threatening emergency, not something I can dispatch a "
-        "technician for. Please hang up right now and call 911, then get "
-        "everyone out of the building."
+        "I'm having trouble understanding you - connecting you to our on-call "
+        "service advisor now."
     ),
     "cannot_verify_caller": (
         "I'm not able to verify this call to make changes to an existing "
-        "appointment, so I'm transferring you to a live dispatcher now."
+        "appointment - connecting you to our on-call service advisor now."
     ),
 }

@@ -25,7 +25,8 @@ load_dotenv(override=True)
 
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 GREETING = (
-    "Thanks for calling our after-hours plumbing and HVAC line. What's going on tonight?"
+    "Thanks for calling our dealership's after-hours service department. "
+    "What's going on with your vehicle?"
 )
 
 
@@ -58,7 +59,7 @@ def check_urgent_no_availability(client, tools) -> bool:
         {"role": "assistant", "content": GREETING},
         {
             "role": "user",
-            "content": "There's water pouring out from under my kitchen sink and flooding the floor!",
+            "content": "My brakes are grinding badly and the warning light just came on.",
         },
     ]
     resp1 = ask(client, tools, messages)
@@ -68,7 +69,7 @@ def check_urgent_no_availability(client, tools) -> bool:
         return False
 
     messages.append({"role": "assistant", "content": resp1.content})
-    messages.append(tool_result(call1, {"slots": []}))
+    messages.append(tool_result(call1, {"slots": [], "outside_window": False}))
     resp2 = ask(client, tools, messages)
     call2 = first_tool_use(resp2)
     ok = bool(call2 and call2.name == "transfer_and_end_call" and call2.input.get("reason") == "urgent_no_availability")
@@ -78,10 +79,14 @@ def check_urgent_no_availability(client, tools) -> bool:
 
 
 def check_non_urgent_no_availability(client, tools) -> bool:
+    # outside_window=True is the Callback promise case (CONTEXT.md) - the DMS
+    # never returns a bare empty result for non_urgent, it widens the search
+    # instead (dms/availability.py). Just checks the model doesn't transfer;
+    # exactly how it phrases the callback-promise offer is Day 3 scope.
     messages = [
         {"role": "user", "content": "The caller just connected."},
         {"role": "assistant", "content": GREETING},
-        {"role": "user", "content": "My bathroom faucet has been dripping for about a week."},
+        {"role": "user", "content": "I just want to schedule a routine oil change."},
     ]
     resp1 = ask(client, tools, messages)
     call1 = first_tool_use(resp1)
@@ -90,15 +95,22 @@ def check_non_urgent_no_availability(client, tools) -> bool:
         return False
 
     messages.append({"role": "assistant", "content": resp1.content})
-    messages.append(tool_result(call1, {"slots": []}))
+    messages.append(
+        tool_result(
+            call1,
+            {
+                "slots": [
+                    {"technician_id": 1, "technician_name": "Mike Alvarez", "time_slot": "2030-06-20T09:00:00"}
+                ],
+                "outside_window": True,
+            },
+        )
+    )
     resp2 = ask(client, tools, messages)
     call2 = first_tool_use(resp2)
-    ok = bool(call2 and call2.name == "end_call")
+    ok = call2 is None or call2.name != "transfer_and_end_call"
     if not ok:
-        print(
-            f"  FAIL: expected the callback-promise line + end_call in the same turn, "
-            f"got {call2.name if call2 else None}"
-        )
+        print(f"  FAIL: non-urgent with a callback-promise slot should never transfer, got {call2.name}")
     return ok
 
 
@@ -142,7 +154,7 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
     messages = [
         {"role": "user", "content": "The caller just connected."},
         {"role": "assistant", "content": GREETING},
-        {"role": "user", "content": "My bathroom faucet has been dripping for about a week."},
+        {"role": "user", "content": "I just want to schedule a routine oil change."},
     ]
     resp1 = ask(client, tools, messages)
     call1 = first_tool_use(resp1)
@@ -154,7 +166,12 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
     messages.append(
         tool_result(
             call1,
-            {"slots": [{"technician_id": 1, "technician_name": "Mike Alvarez", "time_slot": "2030-06-10T09:00:00"}]},
+            {
+                "slots": [
+                    {"technician_id": 1, "technician_name": "Mike Alvarez", "time_slot": "2030-06-10T09:00:00"}
+                ],
+                "outside_window": False,
+            },
         )
     )
     resp2 = ask(client, tools, messages)
@@ -167,7 +184,10 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
     messages.append(
         {
             "role": "user",
-            "content": "That works. This is Jamie Rivera, phone number 555-042-8871.",
+            "content": (
+                "That works. This is Jamie Rivera, phone number 555-042-8871, "
+                "it's a 2019 Honda Civic."
+            ),
         }
     )
     resp3 = ask(client, tools, messages)
@@ -175,8 +195,8 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
     ok = call3 is None
     if not ok:
         print(
-            f"  FAIL: expected the model to read back name/phone and ask for confirmation "
-            f"before booking, but it called {call3.name} immediately"
+            f"  FAIL: expected the model to read back name/phone/vehicle and ask for "
+            f"confirmation before booking, but it called {call3.name} immediately"
         )
         return False
 
@@ -189,10 +209,12 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
         and call4.name == "book_appointment"
         and call4.input.get("customer_name") == "Jamie Rivera"
         and "5550428871" in re.sub(r"\D", "", call4.input.get("customer_phone", ""))
+        and call4.input.get("vehicle_make", "").lower() == "honda"
+        and call4.input.get("vehicle_year") == 2019
     )
     if not ok:
         print(
-            f"  FAIL: expected book_appointment with the confirmed name/phone, got "
+            f"  FAIL: expected book_appointment with the confirmed name/phone/vehicle, got "
             f"{call4.name if call4 else None} {call4.input if call4 else ''}"
         )
         return False
@@ -208,6 +230,9 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
                     "time_slot": "2030-06-10T09:00:00",
                     "customer_name": "Jamie Rivera",
                     "customer_phone": "555-042-8871",
+                    "vehicle_make": "Honda",
+                    "vehicle_model": "Civic",
+                    "vehicle_year": 2019,
                     "urgency": "non_urgent",
                     "status": "booked",
                 }
@@ -221,28 +246,6 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
         print(
             f"  FAIL: expected the booking-confirmed line + end_call in the same turn, "
             f"got {call5.name if call5 else None}"
-        )
-    return ok
-
-
-def check_gas_leak_emergency(client, tools) -> bool:
-    messages = [
-        {"role": "user", "content": "The caller just connected."},
-        {"role": "assistant", "content": GREETING},
-        {"role": "user", "content": "I smell gas in my kitchen, it's really strong."},
-    ]
-    resp1 = ask(client, tools, messages)
-    call1 = first_tool_use(resp1)
-    ok = bool(
-        call1
-        and call1.name == "transfer_and_end_call"
-        and call1.input.get("reason") == "life_threatening_emergency"
-    )
-    if not ok:
-        print(
-            f"  FAIL: expected immediate transfer_and_end_call(life_threatening_emergency) "
-            f"with no availability check first, got {call1.name if call1 else None} "
-            f"{call1.input if call1 else ''}"
         )
     return ok
 
@@ -301,7 +304,6 @@ def main():
     )
 
     checks = [
-        ("gas leak -> immediate 911 escalation, no classification", check_gas_leak_emergency),
         ("modify request -> find_appointment first", check_modify_request_triggers_find_appointment),
         ("unverified caller -> transfer, not phone-number fallback", check_unverified_caller_transferred),
         ("urgent + no availability -> transfer", check_urgent_no_availability),

@@ -1,6 +1,11 @@
-"""Day 2 model comparison: does the dispatch system prompt actually get the
-fixed urgency/specialty classification right, and how much slower is Sonnet
-than Haiku on time-to-first-token?
+"""Day 1/2 model comparison: does the service-department system prompt
+actually get the fixed Urgent/Non-urgent classification right (CONTEXT.md's
+category list), and how much slower is Sonnet than Haiku on time-to-first
+-token?
+
+There's no specialty to grade here (unlike the old plumbing/HVAC version) -
+technician type is derived from urgency alone inside the DMS, not classified
+by the model. See dms/availability.py and CONTEXT.md's Technician entry.
 
 Text-only - approximates what STT would have handed the LLM, not a real
 call. Costs a small amount of real API spend each run (~16 short requests).
@@ -29,7 +34,8 @@ MODELS = {
 # grading) so every scenario starts from the same two-turn context the real
 # pipeline would have by the time the caller states their problem.
 GREETING = (
-    "Thanks for calling our after-hours plumbing and HVAC line. What's going on tonight?"
+    "Thanks for calling our dealership's after-hours service department. "
+    "What's going on with your vehicle?"
 )
 
 
@@ -38,57 +44,65 @@ class Scenario:
     label: str
     utterance: str
     expected_urgency: str
-    expected_specialty: str | None  # None = ambiguous by design, don't grade
 
 
+# One scenario per CONTEXT.md category, on both sides of the Urgent/
+# Non-urgent line.
 SCENARIOS = [
     Scenario(
-        "water_damage",
-        "There's water pouring out from under my kitchen sink and it's flooding onto the floor!",
+        "brake_grinding",
+        "My brakes have been grinding really badly the last two days.",
         "urgent",
-        "plumbing",
     ),
     Scenario(
-        "no_heat_freezing",
-        "My heat's completely out and it's like 15 degrees outside, I'm worried about my pipes.",
+        "soft_brake_pedal",
+        "My brake pedal feels really soft, like it's sinking to the floor.",
         "urgent",
-        "hvac",
     ),
     Scenario(
-        "sewage_backup",
-        "My toilet is overflowing and sewage is backing up into the bathtub.",
+        "steering_failure",
+        "My steering wheel is shaking violently and feels loose.",
         "urgent",
-        "plumbing",
     ),
     Scenario(
-        "gas_smell",
-        "I smell gas near my furnace.",
+        "fluid_leak",
+        "There's a big puddle of fluid under my car this morning, it's actively dripping.",
         "urgent",
-        None,  # system prompt never says which trade a gas smell falls under
     ),
     Scenario(
-        "dripping_faucet",
-        "My bathroom faucet has been dripping for like a week, not urgent but annoying.",
-        "non_urgent",
-        "plumbing",
+        "overheating",
+        "My engine temperature gauge is pegged in the red and there's smoke coming from the hood.",
+        "urgent",
     ),
     Scenario(
-        "no_hot_water",
-        "We haven't had hot water since yesterday morning.",
-        "non_urgent",
-        "plumbing",
+        "airbag_light",
+        "My airbag warning light just came on and stayed on.",
+        "urgent",
     ),
     Scenario(
-        "rattling_ac",
-        "My AC unit is making a weird rattling noise but it still cools fine.",
+        "oil_change",
+        "Just want to schedule my regular oil change.",
         "non_urgent",
-        "hvac",
     ),
     Scenario(
-        "routine_maintenance",
-        "Just want to schedule the yearly furnace maintenance check.",
+        "tire_rotation",
+        "I'd like to get my tires rotated, nothing urgent.",
         "non_urgent",
-        "hvac",
+    ),
+    Scenario(
+        "inspection",
+        "I need to get my annual inspection done sometime this week.",
+        "non_urgent",
+    ),
+    Scenario(
+        "minor_noise",
+        "There's a little squeak coming from one of my doors, not a big deal.",
+        "non_urgent",
+    ),
+    Scenario(
+        "infotainment",
+        "My touchscreen radio keeps freezing up, kind of annoying but the car drives fine.",
+        "non_urgent",
     ),
 ]
 
@@ -121,11 +135,11 @@ def run_scenario(client: Anthropic, model_id: str, tools: list[dict], scenario: 
         "ttft_s": round(first_event_at - start, 3),
         "called_tool": tool_use.name if tool_use else None,
         "urgency": tool_use.input.get("urgency") if tool_use else None,
-        "specialty": tool_use.input.get("specialty") if tool_use else None,
     }
-    result["urgency_ok"] = tool_use is not None and result["urgency"] == scenario.expected_urgency
-    result["specialty_ok"] = (
-        scenario.expected_specialty is None or result["specialty"] == scenario.expected_specialty
+    result["urgency_ok"] = (
+        tool_use is not None
+        and tool_use.name == "check_availability"
+        and result["urgency"] == scenario.expected_urgency
     )
     return result
 
@@ -136,17 +150,17 @@ def main():
         ToolsSchema(standard_tools=build_tool_schemas())
     )
 
-    header = f"{'model':<8} {'scenario':<20} {'tool':<20} {'urgency':<10} {'specialty':<10} {'ttft_s':<8} ok"
+    header = f"{'model':<8} {'scenario':<16} {'tool':<20} {'urgency':<10} {'ttft_s':<8} ok"
     print(header)
     print("-" * len(header))
 
     for model_name, model_id in MODELS.items():
         for scenario in SCENARIOS:
             r = run_scenario(client, model_id, tools, scenario)
-            ok = "OK" if (r["urgency_ok"] and r["specialty_ok"]) else "MISS"
+            ok = "OK" if r["urgency_ok"] else "MISS"
             print(
-                f"{model_name:<8} {r['scenario']:<20} {str(r['called_tool']):<20} "
-                f"{str(r['urgency']):<10} {str(r['specialty']):<10} {r['ttft_s']:<8} {ok}"
+                f"{model_name:<8} {r['scenario']:<16} {str(r['called_tool']):<20} "
+                f"{str(r['urgency']):<10} {r['ttft_s']:<8} {ok}"
             )
 
 
