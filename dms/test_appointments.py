@@ -23,6 +23,18 @@ def test_create_appointment_success(client, technicians):
     assert resp.json()["status"] == "booked"
 
 
+def test_create_appointment_enqueues_confirmation_sms_job(client, technicians):
+    resp = _book(client, technicians["mike"], future_slot())
+    appointment_id = resp.json()["id"]
+
+    jobs = client.get("/jobs", params={"status": "pending"}).json()
+    assert len(jobs) == 1
+    assert jobs[0]["job_type"] == "confirmation_sms"
+    assert jobs[0]["payload"]["to"] == "555-0101"
+    assert "Mike Alvarez" in jobs[0]["payload"]["body"]
+    assert appointment_id  # sanity: booking itself still succeeded
+
+
 def test_unknown_technician_rejected(client, technicians):
     resp = _book(client, 999, future_slot())
     assert resp.status_code == 404

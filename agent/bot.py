@@ -423,6 +423,22 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         reason = params.arguments["reason"]
         message = TRANSFER_MESSAGES[reason]
         await llm.push_frame(TTSSpeakFrame(text=message), FrameDirection.DOWNSTREAM)
+        # Logs the Handoff simulation to the DMS, which enqueues its
+        # Follow-up job (handoff SMS) in the same DB transaction - see
+        # dms/handoffs.py and ADR-0002. Best-effort: no verified caller
+        # number, or a DMS error, means no way to text them, not a reason
+        # to fail the call itself.
+        caller_number = await get_verified_caller_number()
+        if caller_number:
+            try:
+                response = await dms_client.post(
+                    "/handoffs", json={"customer_phone": caller_number, "reason": reason}
+                )
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                logger.error(f"DMS handoff logging failed: {e}")
+        else:
+            logger.warning("transfer_and_end_call: no verified caller number, skipping Handoff log")
         await llm.push_frame(EndFrame(reason=reason), FrameDirection.DOWNSTREAM)
         await params.result_callback(
             {"transferred": True}, properties=FunctionCallResultProperties(run_llm=False)

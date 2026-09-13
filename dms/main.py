@@ -10,6 +10,8 @@ from appointments import router as appointments_router
 from auth import verify_api_key
 from availability import router as availability_router
 from db import Base, engine
+from handoffs import router as handoffs_router
+from jobs import router as jobs_router
 from technicians import router as technicians_router
 
 
@@ -24,6 +26,8 @@ app = FastAPI(title="PitLine Mock DMS", lifespan=lifespan)
 app.include_router(technicians_router, dependencies=[Depends(verify_api_key)])
 app.include_router(appointments_router, dependencies=[Depends(verify_api_key)])
 app.include_router(availability_router, dependencies=[Depends(verify_api_key)])
+app.include_router(handoffs_router, dependencies=[Depends(verify_api_key)])
+app.include_router(jobs_router, dependencies=[Depends(verify_api_key)])
 
 
 @app.get("/health")

@@ -42,6 +42,20 @@ class Appointment(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class Handoff(Base):
+    """A Handoff simulation event (CONTEXT.md) - logged so the Ops Dashboard
+    (Day 4) has something to show for a safety transfer, since it has no
+    Appointment of its own to point to.
+    """
+
+    __tablename__ = "handoffs"
+
+    id = Column(Integer, primary_key=True)
+    customer_phone = Column(String, nullable=False)
+    reason = Column(String, nullable=False)  # matches call_transfer.py's TRANSFER_MESSAGES keys
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class Job(Base):
     """Follow-up job queue - a row enqueued (same transaction as the
     Appointment/Handoff write it follows from) when a call ends, drained by

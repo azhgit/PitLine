@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import Appointment, Technician
+from models import Appointment, Job, Technician
 from rate_limit import check_rate_limit
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -101,7 +101,8 @@ def create_appointment(
         )
     if payload.urgency not in URGENCIES:
         raise HTTPException(status_code=422, detail=f"Invalid urgency: {payload.urgency}")
-    if db.get(Technician, payload.technician_id) is None:
+    technician = db.get(Technician, payload.technician_id)
+    if technician is None:
         raise HTTPException(status_code=404, detail="Technician not found")
     # App-level check-then-insert, not a DB constraint - there's a small race
     # window under concurrent requests. Fine at demo scale (single process);
@@ -122,6 +123,20 @@ def create_appointment(
         )
     appointment = Appointment(**payload.model_dump())
     db.add(appointment)
+    # Same transaction as the Appointment write (ADR-0002) - a booking can
+    # never exist without its confirmation SMS being queued.
+    db.add(
+        Job(
+            job_type="confirmation_sms",
+            payload={
+                "to": appointment.customer_phone,
+                "body": (
+                    f"Your appointment with {technician.name} is confirmed for "
+                    f"{appointment.time_slot.strftime('%A, %B %d at %-I:%M %p')}. See you then!"
+                ),
+            },
+        )
+    )
     db.commit()
     return _serialize(appointment)
 
