@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db import get_db
+from events import broadcaster
 from models import Handoff, Job
 
 router = APIRouter(prefix="/handoffs", tags=["handoffs"])
@@ -30,7 +31,7 @@ def list_handoffs(db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_handoff(payload: HandoffCreate, db: Session = Depends(get_db)):
+async def create_handoff(payload: HandoffCreate, db: Session = Depends(get_db)):
     handoff = Handoff(customer_phone=payload.customer_phone, reason=payload.reason)
     db.add(handoff)
     db.flush()  # assigns handoff.id before the Job payload below needs it indirectly
@@ -50,4 +51,6 @@ def create_handoff(payload: HandoffCreate, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(handoff)
-    return _serialize(handoff)
+    serialized = _serialize(handoff)
+    await broadcaster.publish("handoff_created", serialized)
+    return serialized

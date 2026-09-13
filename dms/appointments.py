@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db import get_db
+from events import broadcaster
 from models import Appointment, Job, Technician
 from rate_limit import check_rate_limit
 
@@ -86,7 +87,7 @@ def get_appointment(appointment_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_appointment(
+async def create_appointment(
     payload: AppointmentCreate,
     db: Session = Depends(get_db),
     x_skip_rate_limit: bool = Header(default=False, alias="X-Skip-Rate-Limit"),
@@ -138,7 +139,9 @@ def create_appointment(
         )
     )
     db.commit()
-    return _serialize(appointment)
+    serialized = _serialize(appointment)
+    await broadcaster.publish("appointment_created", serialized)
+    return serialized
 
 
 @router.patch("/{appointment_id}")
