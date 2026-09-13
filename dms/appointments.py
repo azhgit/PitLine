@@ -3,6 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from db import get_db
@@ -96,7 +97,7 @@ async def create_appointment(
     # API key), and only after code - not the LLM - has confirmed this
     # booking is the rebook half of a Caller-ID-verified reschedule. See
     # agent/bot.py's book_appointment for where it's actually set.
-    if not x_skip_rate_limit and not check_rate_limit(payload.customer_phone):
+    if not x_skip_rate_limit and not check_rate_limit(db, payload.customer_phone):
         raise HTTPException(
             status_code=429, detail="Too many booking attempts for this phone number"
         )
@@ -105,10 +106,10 @@ async def create_appointment(
     technician = db.get(Technician, payload.technician_id)
     if technician is None:
         raise HTTPException(status_code=404, detail="Technician not found")
-    # App-level check-then-insert, not a DB constraint - there's a small race
-    # window under concurrent requests. Fine at demo scale (single process);
-    # if that changes, replace with a partial unique index on
-    # (technician_id, time_slot) WHERE status='booked'.
+    # App-level check first for a fast, friendly error on the common case -
+    # but the actual race window between two concurrent requests both
+    # passing this check is closed by the partial unique index in
+    # models.py (see ADR-0003), not by this check alone.
     conflict = (
         db.query(Appointment)
         .filter(
@@ -138,7 +139,16 @@ async def create_appointment(
             },
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The unique index caught a genuine race the app-level check above
+        # missed - another request for the same technician/slot committed
+        # first, in the gap between that check and this commit.
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Technician is already booked for that time slot"
+        )
     serialized = _serialize(appointment)
     await broadcaster.publish("appointment_created", serialized)
     return serialized

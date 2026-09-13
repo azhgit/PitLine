@@ -1,4 +1,55 @@
+from datetime import datetime
+
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from conftest import future_slot
+from db import SessionLocal
+from models import Appointment
+
+
+def test_db_rejects_double_booked_slot_even_bypassing_the_app_check(technicians):
+    """The partial unique index itself (models.py), not the app-level
+    check-then-insert in appointments.py that a real race could slip past -
+    see ADR-0003. Inserts directly through the ORM, skipping the API/app
+    check entirely, to prove the DB is the actual backstop.
+    """
+    slot = datetime.fromisoformat(future_slot(day_offset=1, hour=9))
+    db = SessionLocal()
+    try:
+        db.add(
+            Appointment(
+                technician_id=technicians["mike"],
+                time_slot=slot,
+                customer_name="Carla",
+                customer_phone="555-0101",
+                vehicle_make="Honda",
+                vehicle_model="Civic",
+                vehicle_year=2020,
+                urgency="non_urgent",
+                status="booked",
+            )
+        )
+        db.commit()
+
+        db.add(
+            Appointment(
+                technician_id=technicians["mike"],
+                time_slot=slot,
+                customer_name="Bob",
+                customer_phone="555-0102",
+                vehicle_make="Toyota",
+                vehicle_model="Camry",
+                vehicle_year=2019,
+                urgency="non_urgent",
+                status="booked",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+    finally:
+        db.rollback()
+        db.close()
 
 
 def _book(client, technician_id, slot, name="Carla", phone="555-0101", urgency="non_urgent"):

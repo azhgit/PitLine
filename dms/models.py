@@ -4,9 +4,11 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -28,6 +30,22 @@ class Technician(Base):
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (
+        # Closes the race window appointments.py's own check-then-insert
+        # can't: two concurrent bookings for the same technician/slot both
+        # pass the app-level conflict check, then both insert. The DB is
+        # the only thing that can actually serialize that. Partial (not a
+        # plain unique constraint) so a cancelled-then-rebooked slot still
+        # works - see test_cancelled_appointment_frees_slot.
+        Index(
+            "uq_appointments_technician_slot_booked",
+            "technician_id",
+            "time_slot",
+            unique=True,
+            postgresql_where=text("status = 'booked'"),
+            sqlite_where=text("status = 'booked'"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
     technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=False)
@@ -39,6 +57,21 @@ class Appointment(Base):
     vehicle_year = Column(Integer, nullable=False)
     urgency = Column(String, nullable=False, default="non_urgent")  # urgent/non_urgent
     status = Column(String, nullable=False, default="booked")  # booked/completed/cancelled
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class BookingAttempt(Base):
+    """One row per call to check_rate_limit (rate_limit.py), booking success
+    or not - deliberately not just successful bookings, so a caller can't
+    dodge the limit by intentionally colliding with an already-booked slot.
+    Postgres-backed (not an in-process dict) so the limit actually holds if
+    this service ever runs more than one replica - see ADR-0003.
+    """
+
+    __tablename__ = "booking_attempts"
+
+    id = Column(Integer, primary_key=True)
+    phone = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
 

@@ -63,6 +63,12 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
 
+    // Re-fetched on every (re)connect, not just on mount - EventSource
+    // doesn't replay events missed while disconnected, so without this a
+    // booking made during a DMS outage would never appear until a manual
+    // page refresh. REST is the source of truth here; each call replaces
+    // state outright rather than merging, so a missed-then-caught-up gap
+    // can't produce duplicates.
     async function loadHistory() {
       try {
         const [appointmentsRes, handoffsRes] = await Promise.all([
@@ -87,16 +93,12 @@ export default function Page() {
       }
     }
 
-    loadHistory();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     const source = new EventSource(authedUrl("/events"));
 
-    source.onopen = () => setConnection("connected");
+    source.onopen = () => {
+      setConnection("connected");
+      loadHistory();
+    };
     // The browser's EventSource retries on its own (part of the SSE spec) -
     // this just reflects that state in the UI rather than implementing
     // reconnection logic itself.
@@ -116,7 +118,10 @@ export default function Page() {
       }
     };
 
-    return () => source.close();
+    return () => {
+      cancelled = true;
+      source.close();
+    };
   }, []);
 
   return (

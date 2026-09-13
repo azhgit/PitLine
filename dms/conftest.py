@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from db import Base, SessionLocal, engine
 from main import app
 from models import Technician
-from rate_limit import reset_rate_limits
 
 
 def future_slot(day_offset: int = 1, hour: int = 9) -> str:
@@ -23,15 +22,13 @@ def future_slot(day_offset: int = 1, hour: int = 9) -> str:
 
 @pytest.fixture(autouse=True)
 def reset_db():
+    # Also covers booking_attempts (rate_limit.py is Postgres-backed, not an
+    # in-process dict - see ADR-0003), so there's no separate rate-limit
+    # reset fixture needed.
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture(autouse=True)
-def clear_rate_limits():
-    reset_rate_limits()
 
 
 @pytest.fixture

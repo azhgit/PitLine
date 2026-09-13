@@ -250,6 +250,39 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
     return ok
 
 
+def check_dms_unavailable_ends_call_gracefully(client, tools) -> bool:
+    messages = [
+        {"role": "user", "content": "The caller just connected."},
+        {"role": "assistant", "content": GREETING},
+        {"role": "user", "content": "I just want to schedule a routine oil change."},
+    ]
+    resp1 = ask(client, tools, messages)
+    call1 = first_tool_use(resp1)
+    if not call1 or call1.name != "check_availability":
+        print(f"  FAIL: expected check_availability first, got {call1.name if call1 else None}")
+        return False
+
+    messages.append({"role": "assistant", "content": resp1.content})
+    messages.append(tool_result(call1, {"error": "dms_unavailable"}))
+    resp2 = ask(client, tools, messages)
+    call2 = first_tool_use(resp2)
+    ok = bool(call2 and call2.name == "end_call")
+    if not ok:
+        print(
+            f"  FAIL: expected a system-trouble line + end_call (not a retry or an invented "
+            f"time), got {call2.name if call2 else None} {call2.input if call2 else ''}"
+        )
+        return False
+
+    # Also check it didn't quietly confirm a booking that never happened.
+    text_blocks = [b.text for b in resp2.content if b.type == "text"]
+    said = " ".join(text_blocks).lower()
+    ok = "confirm" not in said or "trouble" in said or "system" in said
+    if not ok:
+        print(f"  FAIL: response sounds like a fake confirmation, not a system-trouble message: {said!r}")
+    return ok
+
+
 def check_modify_request_triggers_find_appointment(client, tools) -> bool:
     messages = [
         {"role": "user", "content": "The caller just connected."},
@@ -304,6 +337,7 @@ def main():
     )
 
     checks = [
+        ("DMS unavailable -> graceful end_call, no retry/fake confirm", check_dms_unavailable_ends_call_gracefully),
         ("modify request -> find_appointment first", check_modify_request_triggers_find_appointment),
         ("unverified caller -> transfer, not phone-number fallback", check_unverified_caller_transferred),
         ("urgent + no availability -> transfer", check_urgent_no_availability),
