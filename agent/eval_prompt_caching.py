@@ -30,7 +30,7 @@ from bot import SYSTEM_INSTRUCTION, build_tool_schemas
 load_dotenv(override=True)
 
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
-USER_TURN = "My bathroom faucet has been dripping for about a week."
+USER_TURN = "I just want to schedule a routine oil change."
 
 
 def cached_system_block():

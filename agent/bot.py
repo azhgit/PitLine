@@ -266,7 +266,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             system_instruction=SYSTEM_INSTRUCTION,
             # Not enable_prompt_caching=True: measured with eval_prompt_caching.py
             # against the real API - Haiku 4.5 needs >=4096 tokens to actually
-            # cache anything, and SYSTEM_INSTRUCTION + tools + a turn is ~1400.
+            # cache anything, and SYSTEM_INSTRUCTION + tools + a turn is ~2155
+            # (re-measured after Day 1's prompt rewrite - still well under).
             # Confirmed via cache_creation_input_tokens/cache_read_input_tokens
             # in the response (both 0), not just inferred from timing. Revisit
             # only if the prompt grows past that floor for other reasons.

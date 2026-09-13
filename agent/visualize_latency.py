@@ -1,4 +1,4 @@
-"""Day 4: turn agent/latency_log.jsonl (written by LatencyLogObserver during
+"""Day 2: turn agent/latency_log.jsonl (written by LatencyLogObserver during
 real calls) into a bar chart of average time-to-first-byte/audio per pipeline
 stage, in ms. Run manually after at least one real call: python
 visualize_latency.py
