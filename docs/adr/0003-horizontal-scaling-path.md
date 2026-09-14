@@ -15,28 +15,38 @@ call, so any replica can take any call - there's no session affinity to
 design for. The dashboard is a stateless Next.js app; N replicas of it need
 nothing beyond what a load balancer already gives for free.
 
-**What needed a real fix, not just a note** - `dms/rate_limit.py`'s booking
-limiter was an in-process dict: correct at one replica, silently wrong at
-two (each replica would allow its own separate quota). Rewritten to a
-Postgres table (`booking_attempts`) instead, so the limit holds regardless
-of replica count - same table this project already runs, not a new store.
+**What needed a real fix, and is now actually fixed, not just noted here**:
+
+- `dms/rate_limit.py`'s booking limiter was an in-process dict: correct at
+  one replica, silently wrong at two (each replica would allow its own
+  separate quota). Rewritten onto a Postgres table (`booking_attempts`)
+  instead, so the limit holds regardless of replica count - same database
+  this project already runs, not a new store.
+- `dms/events.py`'s SSE broadcaster was in-process pub/sub - a write on
+  replica A would never have reached a dashboard tab connected to replica
+  B. Rewritten onto Postgres `LISTEN`/`NOTIFY`: `publish()` sends a
+  `NOTIFY`, and a listener connection (opened in `main.py`'s lifespan)
+  forwards every notification - this replica's own and every other
+  replica's - into the same local per-tab queues the dashboard reads from.
+  Verified for real: a second local DMS process on a different port,
+  pointed at the same Postgres, received a live event for a booking made
+  through the *other* process - not simulated, an actual second process.
+- `agent/worker.py` had no claim step - two worker replicas polling
+  `GET /jobs?status=pending` at once could both pick up the same row and
+  double-send an SMS. `dms/jobs.py` now has `POST /jobs/claim`, which does
+  `SELECT ... FOR UPDATE SKIP LOCKED` then marks the row `claimed` in the
+  same transaction - not a plain `SELECT` followed by a separate `PATCH`.
+  `loadtest_concurrency.py` fires 20 concurrent claim calls against 8 real
+  jobs on the live Railway DMS - while its actual worker was *also*
+  concurrently draining the same queue - and no job is ever claimed twice.
 
 **What would still need work past one replica, and how, without adding a
-paid service**:
-
-- `dms/events.py`'s SSE broadcaster is in-process pub/sub - a write on
-  replica A never reaches a dashboard tab connected to replica B. Fix:
-  Postgres `LISTEN`/`NOTIFY` on the same instance instead of an in-memory
-  `set` of queues, so every replica hears every write.
-- `agent/worker.py` has no claim step - two worker replicas polling
-  `GET /jobs?status=pending` at once could both pick up the same row and
-  double-send an SMS. Fix: `SELECT ... FOR UPDATE SKIP LOCKED` (or an
-  atomic `UPDATE ... WHERE status='pending' RETURNING`) when claiming a
-  job, not a plain `SELECT` then a separate `PATCH`.
-- More replicas means more direct Postgres connections; past some count
-  that's a connection-limit problem before it's a compute problem. Fix:
-  PgBouncer in front of Postgres (Railway can provision this on the same
-  database), not a bigger Postgres plan.
+paid service**: more replicas means more direct Postgres connections, and
+past some count that's a connection-limit problem before it's a compute
+problem. Fix: PgBouncer in front of Postgres (Railway can provision this on
+the same database), not a bigger Postgres plan. Not done here - this scale
+doesn't need it yet, and adding it now would be solving a problem this demo
+doesn't have.
 
 None of this needs Redis, a message broker, or a second database - the
 same reasoning as ADR-0002: this scale doesn't need the operational surface
