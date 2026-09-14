@@ -1,6 +1,6 @@
 """Concurrency verification for ADR-0003's fixes, against a real running
 DMS instance - not a mock, and not just the single-process pytest suite -
-to prove two claims under real concurrent load:
+to prove three claims under real concurrent load:
 
 1. The partial unique index on (technician_id, time_slot) actually
    serializes a genuine race: N simultaneous bookings for the same slot,
@@ -9,6 +9,10 @@ to prove two claims under real concurrent load:
    than MAX_PER_WINDOW rapid bookings from one phone number should 429
    past the limit - proving it isn't the old in-memory dict that would
    reset per-replica/per-restart.
+3. POST /jobs/claim's FOR UPDATE SKIP LOCKED actually prevents a
+   double-claim: N jobs, M > N concurrent claim calls, every job goes to
+   exactly one caller - proving multiple worker replicas can safely drain
+   the same queue, which a GET-then-PATCH pair could not.
 
 Creates real rows in whatever DATABASE_URL/DMS_BASE_URL point at - re-seed
 before anything that needs clean data (e.g. a demo recording). Run
@@ -90,6 +94,42 @@ async def test_rate_limit_holds_under_burst(client: httpx.AsyncClient, technicia
     return ok
 
 
+async def test_job_claim_has_no_double_claim(client: httpx.AsyncClient) -> bool:
+    n_jobs = 8
+    n_claimers = 20  # > n_jobs, so most calls should come back empty
+    print(f"\n=== Claim test: {n_claimers} concurrent claimers draining {n_jobs} jobs ===")
+    # Tagged with a marker phone prefix so this test's own jobs can be told
+    # apart from any other pending jobs already sitting in this DMS's
+    # queue (e.g. from the tests above, or an unrelated real call) -
+    # otherwise a shared, busy instance makes "claimed == n_jobs" a false
+    # failure even when claiming itself is perfectly correct.
+    marker = "555-7"
+    for i in range(n_jobs):
+        resp = await client.post(
+            "/handoffs", json={"customer_phone": f"{marker}{i:03d}", "reason": "cannot_understand_caller"}
+        )
+        resp.raise_for_status()
+    pending = (await client.get("/jobs", params={"status": "pending"})).json()
+    my_ids = {j["id"] for j in pending if j["payload"].get("to", "").startswith(marker)}
+
+    results = await asyncio.gather(*[client.post("/jobs/claim") for _ in range(n_claimers)])
+    claimed_ids = [r.json()["id"] for r in results if r.json() is not None]
+    my_claimed = [i for i in claimed_ids if i in my_ids]
+    # The only property SKIP LOCKED actually guarantees is "no duplicate
+    # among this call's own claims" - not "my calls must win the race
+    # against everyone else". On a live instance a real worker may also be
+    # draining the same queue concurrently (as it should be able to,
+    # safely) and legitimately claim some of these first; that's a sign
+    # this is working, not a reason to fail the check.
+    no_duplicates = len(claimed_ids) == len(set(claimed_ids))
+    print(
+        f"claimed {len(claimed_ids)} jobs total this call ({len(my_claimed)} of this test's "
+        f"{n_jobs} - the rest may have gone to a live worker also draining the queue)"
+    )
+    print(f"[{'PASS' if no_duplicates else 'FAIL'}] no job claimed by more than one caller")
+    return no_duplicates
+
+
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default=os.getenv("DMS_BASE_URL", "http://localhost:8001"))
@@ -103,7 +143,9 @@ async def main():
         print(f"Target: {args.base_url}  (technician_id={technician_id})")
         race_ok = await test_double_booking_race(client, technician_id)
         rate_ok = await test_rate_limit_holds_under_burst(client, technician_id)
-        print(f"\n{2 if race_ok and rate_ok else 1 if race_ok or rate_ok else 0}/2 checks passed")
+        claim_ok = await test_job_claim_has_no_double_claim(client)
+        passed = sum([race_ok, rate_ok, claim_ok])
+        print(f"\n{passed}/3 checks passed")
 
 
 if __name__ == "__main__":

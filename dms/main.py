@@ -21,7 +21,9 @@ from technicians import router as technicians_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)  # schema only - seed data is separate, see seed.py
+    await broadcaster.start()
     yield
+    await broadcaster.stop()
 
 
 app = FastAPI(title="PitLine Mock DMS", lifespan=lifespan)

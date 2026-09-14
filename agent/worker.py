@@ -88,12 +88,20 @@ def process_job(client: httpx.Client, job: dict) -> None:
 
 
 def run_once(client: httpx.Client) -> int:
-    response = client.get("/jobs", params={"status": "pending"})
-    response.raise_for_status()
-    jobs = response.json()
-    for job in jobs:
+    # Claims one job at a time (POST /jobs/claim, not GET ?status=pending)
+    # so two worker replicas polling at the same instant can never both
+    # grab the same row - the DMS's FOR UPDATE SKIP LOCKED is what actually
+    # prevents the double-claim, this loop just drains it. See ADR-0003.
+    processed = 0
+    while True:
+        response = client.post("/jobs/claim")
+        response.raise_for_status()
+        job = response.json()
+        if job is None:
+            break
         process_job(client, job)
-    return len(jobs)
+        processed += 1
+    return processed
 
 
 def main():
