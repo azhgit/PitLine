@@ -6,6 +6,7 @@ python-dotenv
 python-multipart
 sse-starlette
 asyncpg
+tzdata
 
 # test-only
 pytest

@@ -33,14 +33,46 @@ function authedUrl(path: string): string {
   return url.toString();
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+// appointment.time_slot is a naive wall-clock string already in the
+// dealership's timezone (America/Vancouver - see dms/dealership_tz.py),
+// not UTC. Parsing it with `new Date(iso)` directly would have the
+// browser reinterpret those digits in the VIEWER's own timezone -
+// correct by coincidence only if they happen to also be in Vancouver,
+// wrong (off by the UTC offset) for anyone else, which defeats the point
+// of a demo recording anyone could be watching. Building the Date via
+// Date.UTC and formatting with timeZone: "UTC" keeps the digits fixed
+// regardless of where the dashboard is opened from.
+function formatDealershipWallClock(iso: string): string {
+  const [datePart, timePart] = iso.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const fixed = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const formatted = fixed.toLocaleString("en-US", {
+    timeZone: "UTC",
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
+  return `${formatted} PT`;
+}
+
+// handoff.created_at is a real UTC instant (Postgres's now(), models.py's
+// server_default) serialized without a trailing "Z" by the ORM - unlike
+// time_slot above, this one genuinely needs converting to Vancouver time,
+// not just relabeling.
+function formatUtcAsDealershipTime(iso: string): string {
+  const utcIso = iso.endsWith("Z") ? iso : `${iso}Z`;
+  const formatted = new Date(utcIso).toLocaleString("en-US", {
+    timeZone: "America/Vancouver",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${formatted} PT`;
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -224,7 +256,7 @@ function AppointmentCard({
       </div>
       <p className="text-sm text-neutral-400">
         {appointment.vehicle_year} {appointment.vehicle_make} {appointment.vehicle_model} ·{" "}
-        {formatTime(appointment.time_slot)}
+        {formatDealershipWallClock(appointment.time_slot)}
       </p>
       <p className="mt-1 text-xs text-neutral-500">Confirmation SMS queued</p>
     </div>
@@ -240,7 +272,7 @@ function HandoffCard({ handoff, isLive }: { handoff: Handoff; isLive: boolean })
     >
       <div className="flex items-center justify-between">
         <span className="font-medium">{handoff.customer_phone}</span>
-        <span className="text-xs text-neutral-500">{formatTime(handoff.created_at)}</span>
+        <span className="text-xs text-neutral-500">{formatUtcAsDealershipTime(handoff.created_at)}</span>
       </div>
       <p className="text-sm text-neutral-400">
         {REASON_LABELS[handoff.reason] ?? handoff.reason}

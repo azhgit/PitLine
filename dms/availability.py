@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from appointments import URGENCIES
 from db import get_db
+from dealership_tz import local_now
 from models import Appointment, Technician
 
 router = APIRouter(prefix="/availability", tags=["availability"])
@@ -35,7 +36,7 @@ def _find_slots(
         .all()
     }
 
-    now = datetime.now()
+    now = local_now()
     day_zero = now.replace(minute=0, second=0, microsecond=0)
     slots = []
     for day_offset in range(day_start, day_end):

@@ -1,11 +1,12 @@
 """Reset the mock DMS DB and load fixed demo data. Run explicitly: python seed.py"""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from dealership_tz import local_now
 from db import Base, SessionLocal, engine
 from models import Appointment, Technician
 
-TODAY = datetime.now().replace(minute=0, second=0, microsecond=0)
+TODAY = local_now().replace(minute=0, second=0, microsecond=0)
 
 
 def seed():

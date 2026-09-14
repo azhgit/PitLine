@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_dms.db"
 os.environ["DMS_API_KEY"] = "test-api-key"
@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from db import Base, SessionLocal, engine
+from dealership_tz import local_now
 from main import app
 from models import Technician
 
@@ -15,8 +16,11 @@ from models import Technician
 def future_slot(day_offset: int = 1, hour: int = 9) -> str:
     """An ISO timestamp aligned to the same hour-grid availability.py scans,
     so tests can book a slot and know exactly which query it'll show up in.
+    Uses the same dealership-timezone clock availability.py does (not the
+    test runner's own OS timezone), so this stays correct regardless of
+    what timezone CI happens to run in.
     """
-    day_zero = datetime.now().replace(minute=0, second=0, microsecond=0)
+    day_zero = local_now().replace(minute=0, second=0, microsecond=0)
     return (day_zero + timedelta(days=day_offset)).replace(hour=hour).isoformat()
 
 
