@@ -1,6 +1,7 @@
 pipecat-ai[deepgram,elevenlabs,anthropic,silero,websocket,runner]
 python-dotenv
 httpx
+twilio
 
 # viz-only (agent/visualize_latency.py)
 matplotlib

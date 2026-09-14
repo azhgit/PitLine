@@ -563,7 +563,41 @@ async def bot(runner_args: RunnerArguments):
     await run_bot(transport, runner_args)
 
 
+def _cli_proxy_arg() -> str | None:
+    """Reads -x/--proxy from argv directly, before pipecat's own main()
+    parses it - the TwilioWebhookAuthMiddleware needs the same proxy
+    hostname pipecat would otherwise embed in its own (now bypassed, see
+    twilio_auth.py) TwiML template.
+    """
+    import sys
+
+    for flag in ("-x", "--proxy"):
+        if flag in sys.argv:
+            i = sys.argv.index(flag)
+            if i + 1 < len(sys.argv):
+                return sys.argv[i + 1]
+    return None
+
+
 if __name__ == "__main__":
+    import pipecat.runner.run as pipecat_run
     from pipecat.runner.run import main
+
+    from twilio_auth import TwilioWebhookAuthMiddleware
+
+    # Not passed via --ws-auth: this is read by pipecat's own argparse
+    # default (PIPECAT_WEBSOCKET_AUTH env var) inside main(), so it has to
+    # be set before main() runs, same requirement as the CLI flag would have.
+    os.environ.setdefault("PIPECAT_WEBSOCKET_AUTH", "token")
+
+    # Railway auto-injects this for any service with a generated domain;
+    # falls back to argv for local ngrok dev, where it isn't set.
+    proxy = os.environ.get("RAILWAY_PUBLIC_DOMAIN") or _cli_proxy_arg() or ""
+    if not proxy:
+        logger.warning(
+            "No public proxy hostname found (RAILWAY_PUBLIC_DOMAIN unset, no -x/--proxy "
+            "arg) - Twilio's TwiML response will point at an empty wss:// host."
+        )
+    pipecat_run.app.add_middleware(TwilioWebhookAuthMiddleware, proxy=proxy)
 
     main()
