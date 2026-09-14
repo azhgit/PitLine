@@ -93,6 +93,16 @@ const REASON_LABELS: Record<string, string> = {
   cannot_verify_caller: "Could not verify caller",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  booked: "Booked",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+type Selection =
+  | { type: "appointment"; appointment: Appointment; technician: Technician | undefined }
+  | { type: "handoff"; handoff: Handoff };
+
 export default function Page() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [handoffs, setHandoffs] = useState<Handoff[]>([]);
@@ -104,6 +114,7 @@ export default function Page() {
   // (ref.current can't be - see react-hooks/refs), so it needs to be part
   // of the render output React tracks.
   const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
+  const [selection, setSelection] = useState<Selection | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +223,9 @@ export default function Page() {
                     .filter((a) => a.technician_id === tech.id && a.status === "booked")
                     .sort((a, b) => a.time_slot.localeCompare(b.time_slot))}
                   liveIds={liveIds}
+                  onSelectAppointment={(appointment) =>
+                    setSelection({ type: "appointment", appointment, technician: tech })
+                  }
                 />
               ))}
             </div>
@@ -229,11 +243,14 @@ export default function Page() {
                 key={h.id}
                 handoff={h}
                 isLive={liveIds.has(`handoff_created:${h.id}`)}
+                onSelect={() => setSelection({ type: "handoff", handoff: h })}
               />
             ))}
           </div>
         </section>
       </main>
+
+      {selection && <SummaryModal selection={selection} onClose={() => setSelection(null)} />}
     </div>
   );
 }
@@ -261,10 +278,12 @@ function TechnicianColumn({
   technician,
   appointments,
   liveIds,
+  onSelectAppointment,
 }: {
   technician: Technician;
   appointments: Appointment[];
   liveIds: Set<string>;
+  onSelectAppointment: (appointment: Appointment) => void;
 }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/50">
@@ -289,6 +308,7 @@ function TechnicianColumn({
             key={a.id}
             appointment={a}
             isLive={liveIds.has(`appointment_created:${a.id}`)}
+            onSelect={() => onSelectAppointment(a)}
           />
         ))}
       </div>
@@ -299,13 +319,24 @@ function TechnicianColumn({
 function AppointmentCard({
   appointment,
   isLive,
+  onSelect,
 }: {
   appointment: Appointment;
   isLive: boolean;
+  onSelect: () => void;
 }) {
   return (
     <div
-      className={`rounded-lg border px-4 py-3 ${
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`cursor-pointer rounded-lg border px-4 py-3 transition-colors hover:border-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 ${
         isLive ? "border-green-800 bg-green-950/30" : "border-neutral-800 bg-neutral-900"
       }`}
     >
@@ -324,10 +355,27 @@ function AppointmentCard({
   );
 }
 
-function HandoffCard({ handoff, isLive }: { handoff: Handoff; isLive: boolean }) {
+function HandoffCard({
+  handoff,
+  isLive,
+  onSelect,
+}: {
+  handoff: Handoff;
+  isLive: boolean;
+  onSelect: () => void;
+}) {
   return (
     <div
-      className={`rounded-lg border px-4 py-3 ${
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`cursor-pointer rounded-lg border px-4 py-3 transition-colors hover:border-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 ${
         isLive ? "border-orange-800 bg-orange-950/30" : "border-neutral-800 bg-neutral-900"
       }`}
     >
@@ -339,6 +387,106 @@ function HandoffCard({ handoff, isLive }: { handoff: Handoff; isLive: boolean })
         {REASON_LABELS[handoff.reason] ?? handoff.reason}
       </p>
       <p className="mt-1 text-xs text-neutral-500">Handoff SMS queued</p>
+    </div>
+  );
+}
+
+function SummaryModal({ selection, onClose }: { selection: Selection; onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const title =
+    selection.type === "appointment" ? selection.appointment.customer_name : selection.handoff.customer_phone;
+
+  return (
+    <div
+      className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Summary for ${title}`}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-lg border border-neutral-800 bg-neutral-900 p-5 shadow-xl"
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          >
+            ✕
+          </button>
+        </div>
+
+        {selection.type === "appointment" ? (
+          <AppointmentSummary appointment={selection.appointment} technician={selection.technician} />
+        ) : (
+          <HandoffSummary handoff={selection.handoff} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-neutral-800 py-2 last:border-none">
+      <span className="text-xs uppercase tracking-wide text-neutral-500">{label}</span>
+      <span className="text-right text-sm text-neutral-100">{value}</span>
+    </div>
+  );
+}
+
+function AppointmentSummary({
+  appointment,
+  technician,
+}: {
+  appointment: Appointment;
+  technician: Technician | undefined;
+}) {
+  return (
+    <div>
+      <SummaryRow label="Vehicle" value={`${appointment.vehicle_year} ${appointment.vehicle_make} ${appointment.vehicle_model}`} />
+      <SummaryRow label="Phone" value={appointment.customer_phone} />
+      <SummaryRow label="Scheduled" value={formatDealershipWallClock(appointment.time_slot)} />
+      <SummaryRow
+        label="Technician"
+        value={technician ? `${technician.name} (${SPECIALTY_LABELS[technician.specialty]})` : `#${appointment.technician_id}`}
+      />
+      <SummaryRow
+        label="Urgency"
+        value={
+          appointment.urgency === "urgent" ? (
+            <span className="rounded bg-red-900/60 px-2 py-0.5 text-xs text-red-300">Urgent</span>
+          ) : (
+            "Non-urgent"
+          )
+        }
+      />
+      <SummaryRow label="Status" value={STATUS_LABELS[appointment.status] ?? appointment.status} />
+      <SummaryRow label="Appointment #" value={<span className="font-mono">{appointment.id}</span>} />
+      <p className="mt-3 text-xs text-neutral-500">Confirmation SMS queued to this number.</p>
+    </div>
+  );
+}
+
+function HandoffSummary({ handoff }: { handoff: Handoff }) {
+  return (
+    <div>
+      <SummaryRow label="Reason" value={REASON_LABELS[handoff.reason] ?? handoff.reason} />
+      <SummaryRow label="Time" value={formatUtcAsDealershipTime(handoff.created_at)} />
+      <SummaryRow label="Handoff #" value={<span className="font-mono">{handoff.id}</span>} />
+      <p className="mt-3 text-xs text-neutral-500">
+        Handoff SMS queued to this number - no real transfer occurred (simulated).
+      </p>
     </div>
   );
 }
