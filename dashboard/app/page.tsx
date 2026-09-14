@@ -25,6 +25,18 @@ type Handoff = {
   created_at: string;
 };
 
+type Technician = {
+  id: number;
+  name: string;
+  specialty: "quick_service" | "master_technician";
+  on_call: boolean;
+};
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  quick_service: "Quick Service",
+  master_technician: "Master Technician",
+};
+
 type ConnectionState = "connecting" | "connected" | "reconnecting";
 
 function authedUrl(path: string): string {
@@ -84,6 +96,7 @@ const REASON_LABELS: Record<string, string> = {
 export default function Page() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [handoffs, setHandoffs] = useState<Handoff[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [loadError, setLoadError] = useState<string | null>(null);
   // Flags rows that arrived live (via SSE) vs. the initial history fetch,
@@ -103,20 +116,25 @@ export default function Page() {
     // can't produce duplicates.
     async function loadHistory() {
       try {
-        const [appointmentsRes, handoffsRes] = await Promise.all([
+        const [appointmentsRes, handoffsRes, techniciansRes] = await Promise.all([
           fetch(authedUrl("/appointments")),
           fetch(authedUrl("/handoffs")),
+          fetch(authedUrl("/technicians")),
         ]);
-        if (!appointmentsRes.ok || !handoffsRes.ok) {
-          throw new Error(`DMS returned ${appointmentsRes.status}/${handoffsRes.status}`);
+        if (!appointmentsRes.ok || !handoffsRes.ok || !techniciansRes.ok) {
+          throw new Error(
+            `DMS returned ${appointmentsRes.status}/${handoffsRes.status}/${techniciansRes.status}`
+          );
         }
-        const [appointmentsData, handoffsData]: [Appointment[], Handoff[]] = await Promise.all([
-          appointmentsRes.json(),
-          handoffsRes.json(),
-        ]);
+        const [appointmentsData, handoffsData, techniciansData]: [
+          Appointment[],
+          Handoff[],
+          Technician[],
+        ] = await Promise.all([appointmentsRes.json(), handoffsRes.json(), techniciansRes.json()]);
         if (cancelled) return;
         setAppointments([...appointmentsData].reverse());
         setHandoffs(handoffsData);
+        setTechnicians(techniciansData);
         setLoadError(null);
       } catch (err) {
         if (!cancelled) {
@@ -178,39 +196,43 @@ export default function Page() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <section>
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
-              New Appointments ({appointments.length})
-            </h2>
-            <div className="space-y-2">
-              {appointments.length === 0 && <EmptyState label="No appointments yet." />}
-              {appointments.map((a) => (
-                <AppointmentCard
-                  key={a.id}
-                  appointment={a}
-                  isLive={liveIds.has(`appointment_created:${a.id}`)}
+        <section className="mb-10">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
+            Technician Schedule
+          </h2>
+          {technicians.length === 0 ? (
+            <EmptyState label="No technicians yet." />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {technicians.map((tech) => (
+                <TechnicianColumn
+                  key={tech.id}
+                  technician={tech}
+                  appointments={appointments
+                    .filter((a) => a.technician_id === tech.id && a.status === "booked")
+                    .sort((a, b) => a.time_slot.localeCompare(b.time_slot))}
+                  liveIds={liveIds}
                 />
               ))}
             </div>
-          </section>
+          )}
+        </section>
 
-          <section>
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
-              Safety Transfers ({handoffs.length})
-            </h2>
-            <div className="space-y-2">
-              {handoffs.length === 0 && <EmptyState label="No handoffs yet." />}
-              {handoffs.map((h) => (
-                <HandoffCard
-                  key={h.id}
-                  handoff={h}
-                  isLive={liveIds.has(`handoff_created:${h.id}`)}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
+        <section>
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
+            Safety Transfers ({handoffs.length})
+          </h2>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {handoffs.length === 0 && <EmptyState label="No handoffs yet." />}
+            {handoffs.map((h) => (
+              <HandoffCard
+                key={h.id}
+                handoff={h}
+                isLive={liveIds.has(`handoff_created:${h.id}`)}
+              />
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );
@@ -233,6 +255,45 @@ function ConnectionBadge({ state }: { state: ConnectionState }) {
 
 function EmptyState({ label }: { label: string }) {
   return <p className="text-sm text-neutral-500">{label}</p>;
+}
+
+function TechnicianColumn({
+  technician,
+  appointments,
+  liveIds,
+}: {
+  technician: Technician;
+  appointments: Appointment[];
+  liveIds: Set<string>;
+}) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/50">
+      <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+        <div>
+          <p className="font-medium">{technician.name}</p>
+          <p className="text-xs text-neutral-400">{SPECIALTY_LABELS[technician.specialty]}</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-neutral-400">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              technician.on_call ? "bg-green-500" : "bg-neutral-600"
+            }`}
+          />
+          {technician.on_call ? "On call" : "Off call"}
+        </div>
+      </div>
+      <div className="space-y-2 p-3">
+        {appointments.length === 0 && <EmptyState label="No upcoming appointments." />}
+        {appointments.map((a) => (
+          <AppointmentCard
+            key={a.id}
+            appointment={a}
+            isLive={liveIds.has(`appointment_created:${a.id}`)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function AppointmentCard({
