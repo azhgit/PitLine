@@ -45,6 +45,10 @@ def _serialize(a: Appointment) -> dict:
     return {
         "id": a.id,
         "technician_id": a.technician_id,
+        # So the agent can read an existing appointment back by name - it
+        # was saying "technician 2" on cancel calls. ponytail: one lazy load
+        # per row, fine at one-caller's-appointments scale.
+        "technician_name": a.technician.name,
         "time_slot": a.time_slot.isoformat(),
         "customer_name": a.customer_name,
         "customer_phone": a.customer_phone,

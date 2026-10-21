@@ -199,6 +199,8 @@ def stub_tool(scenario: dict, name: str, args: dict) -> dict:
     # Copy, then the same 'spoken' enrichment the real handlers in bot.py apply.
     result = json.loads(json.dumps(result))
     add_spoken_times(result.get("slots", []) + result.get("appointments", []))
+    if name == "check_availability" and "error" not in result:
+        result["calling_number"] = f"{CALLER_ID[:3]}-{CALLER_ID[3:6]}-{CALLER_ID[6:]}"
     return result
 
 

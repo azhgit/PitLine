@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import LLM_THINKING, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -35,7 +35,8 @@ def first_tool_use(message):
 
 def ask(client, tools, messages):
     return client.messages.create(
-        model=MODEL, max_tokens=300, system=SYSTEM_INSTRUCTION, tools=tools, messages=messages
+        model=MODEL, max_tokens=300, system=SYSTEM_INSTRUCTION, tools=tools, messages=messages,
+        thinking={"type": LLM_THINKING},  # what production runs - see bot.py
     )
 
 
@@ -170,6 +171,7 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
                     {"technician_id": 1, "technician_name": "Mike Alvarez", "time_slot": "2030-06-10T09:00:00"}
                 ],
                 "outside_window": False,
+                "calling_number": "555-042-8871",  # bot.py adds this from Caller ID
             },
         )
     )

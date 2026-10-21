@@ -144,11 +144,13 @@ SYSTEM_INSTRUCTION = (
     "make/model/year, and ask whether the number they're calling from is "
     "the best one to reach them. For that number, leave customer_phone out "
     "of book_appointment - it's filled in from the verified calling number, "
-    "so never ask them to say it. You never see the calling number's "
-    "digits, so never state or guess them. Only if they want a different number, "
+    "so never ask them to say it. check_availability's 'calling_number' is "
+    "that verified number (null if unknown - then ask for their number); "
+    "read it back from that field digit for digit, never from memory. Only "
+    "if they want a different number, "
     "collect it and pass it as customer_phone. Read the name, vehicle, and "
-    "number back ('the number you're calling from', or the digits they "
-    "gave) and get an explicit yes before booking - STT can mishear a "
+    "number back (the calling_number digits, or the digits they gave) and "
+    "get an explicit yes before booking - STT can mishear a "
     "name, a digit, or a vehicle detail and there'd be no other way to "
     "catch it. If book_appointment returns error 'phone_needed', ask for "
     "their number and call it again with customer_phone. Only after they "
@@ -384,6 +386,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # {"slots": [...], "outside_window": bool} - see dms/availability.py.
         result = response.json()
         add_spoken_times(result["slots"])
+        # Verified digits for the booking readback, so the model never
+        # transcribes a phone number itself. Called before every booking.
+        caller = normalize_phone(await get_verified_caller_number() or "")
+        result["calling_number"] = f"{caller[:3]}-{caller[3:6]}-{caller[6:]}" if len(caller) == 10 else None
         await params.result_callback(result)
 
     async def book_appointment(params: FunctionCallParams):
