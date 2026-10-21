@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import httpx
 from dotenv import load_dotenv
@@ -101,7 +102,7 @@ SYSTEM_INSTRUCTION = (
     "through find_appointment, don't try asking for their phone number as "
     "a substitute. If verified with no appointment found, say so, then "
     "fall through to the normal flow below if they still want service. If "
-    "verified with an appointment found, read back its time and "
+    "verified with an appointment found, read back its 'spoken' time and "
     "technician, then ask whether they want to reschedule or cancel it:\n"
     "   - Cancel: get an explicit yes, call cancel_appointment with that "
     "appointment_id, confirm it's cancelled, then call end_call.\n"
@@ -127,9 +128,10 @@ SYSTEM_INSTRUCTION = (
     "guess.\n"
     "2. Call check_availability with that urgency. Its result has 'slots' "
     "and 'outside_window':\n"
-    "   - slots non-empty, outside_window false: read them back exactly as "
-    "concrete options (e.g. 'Tuesday at 2pm with Mike, or Wednesday at "
-    "10am with Dana') - never invent a time yourself. Continue to step 3.\n"
+    "   - slots non-empty, outside_window false: read them back as "
+    "concrete options using each slot's 'spoken' field word for word (e.g. "
+    "'Tuesday, June 18 at 2pm with Mike, or Wednesday, June 19 at 10am with "
+    "Dana') - never work out a day or time yourself. Continue to step 3.\n"
     "   - slots non-empty, outside_window true: nothing's open in the next "
     "week - tell the caller that, offer the one returned slot as the "
     "nearest available time, and mention someone will call back sooner if "
@@ -148,6 +150,23 @@ SYSTEM_INSTRUCTION = (
     "Call end_call right after any of these natural conclusions - don't "
     "just stop talking and wait for the caller to hang up.\n"
 )
+def add_spoken_times(items: list[dict]) -> list[dict]:
+    """Adds 'spoken' ("Tuesday, June 18 at 10am") to each item with a
+    time_slot. Computed here, not by the model: with thinking off, Haiku
+    5.5 read 2030-06-18 back as "Thursday" in simulate.py runs.
+    """
+    for item in items:
+        dt = datetime.fromisoformat(item["time_slot"])
+        minutes = f":{dt:%M}" if dt.minute else ""
+        item["spoken"] = f"{dt:%A, %B} {dt.day} at {dt.hour % 12 or 12}{minutes}{dt:%p}".replace("AM", "am").replace("PM", "pm")
+    return items
+
+
+# Haiku 5.5 thinks by default and Pipecat only auto-disables that for
+# Sonnet. A real call on 2026-10-21 measured 0.3-2.6s of thinking per turn
+# on top of a ~0.6s first byte; simulate.py with thinking off held 96%.
+# Shared with simulate.py so the suite tests what production runs.
+LLM_THINKING = "disabled"
 KICKOFF_MESSAGE = (
     "The caller just connected. Greet them in one short sentence as the "
     "dealership's after-hours service department line, then ask what's "
@@ -288,6 +307,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         settings=AnthropicLLMService.Settings(
             model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"),
             system_instruction=SYSTEM_INSTRUCTION,
+            thinking=AnthropicLLMService.ThinkingConfig(type=LLM_THINKING),
             # Not enable_prompt_caching=True: measured with eval_prompt_caching.py
             # against the real API - Haiku 4.5 needs >=4096 tokens to actually
             # cache anything, and SYSTEM_INSTRUCTION + tools + a turn is ~2155
@@ -347,9 +367,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             logger.error(f"DMS availability lookup failed: {e}")
             await params.result_callback({"error": "dms_unavailable"})
             return
-        # Already {"slots": [...], "outside_window": bool} - see
-        # dms/availability.py - passed straight through to the LLM.
-        await params.result_callback(response.json())
+        # {"slots": [...], "outside_window": bool} - see dms/availability.py.
+        result = response.json()
+        add_spoken_times(result["slots"])
+        await params.result_callback(result)
 
     async def book_appointment(params: FunctionCallParams):
         await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
@@ -399,7 +420,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             logger.error(f"DMS appointment lookup failed: {e}")
             await params.result_callback({"error": "dms_unavailable"})
             return
-        await params.result_callback({"verified": True, "appointments": response.json()})
+        await params.result_callback({"verified": True, "appointments": add_spoken_times(response.json())})
 
     async def cancel_appointment(params: FunctionCallParams):
         await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)

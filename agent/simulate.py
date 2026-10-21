@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import KICKOFF_MESSAGE, SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -38,7 +38,7 @@ load_dotenv(override=True)
 # clobbers a shell-set ANTHROPIC_MODEL with .env's.
 AGENT_MODEL = os.getenv("SIM_AGENT_MODEL") or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 # "disabled" to turn off thinking on models that default it on (Haiku 5.5)
-AGENT_THINKING = os.getenv("SIM_AGENT_THINKING")
+AGENT_THINKING = os.getenv("SIM_AGENT_THINKING", LLM_THINKING)
 CALLER_MODEL = os.getenv("SIM_CALLER_MODEL", "claude-haiku-4-5")
 JUDGE_MODEL = os.getenv("SIM_JUDGE_MODEL", "claude-sonnet-5-5")
 RUNS_PER_SCENARIO = 3
@@ -175,16 +175,21 @@ JUDGE_SCHEMA = {
 
 def stub_tool(scenario: dict, name: str, args: dict) -> dict:
     if name in scenario["tools"]:
-        return scenario["tools"][name]
-    if name == "check_availability":
-        return {"slots": QUICK_SLOTS, "outside_window": False}
-    if name == "book_appointment":
+        result = scenario["tools"][name]
+    elif name == "check_availability":
+        result = {"slots": QUICK_SLOTS, "outside_window": False}
+    elif name == "book_appointment":
         return {"appointment": {"id": 101, "status": "booked", **args}}
-    if name == "find_appointment":
-        return {"verified": True, "appointments": []}
-    if name == "cancel_appointment":
-        return {"cancelled": True}
-    return {}
+    elif name == "find_appointment":
+        result = {"verified": True, "appointments": []}
+    elif name == "cancel_appointment":
+        result = {"cancelled": True}
+    else:
+        result = {}
+    # Copy, then the same 'spoken' enrichment the real handlers in bot.py apply.
+    result = json.loads(json.dumps(result))
+    add_spoken_times(result.get("slots", []) + result.get("appointments", []))
+    return result
 
 
 def run_call(client: Anthropic, tools: list, scenario: dict) -> dict:
