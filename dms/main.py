@@ -6,6 +6,7 @@ load_dotenv()
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sse_starlette.sse import EventSourceResponse
 
 from appointments import router as appointments_router
@@ -21,6 +22,13 @@ from technicians import router as technicians_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)  # schema only - seed data is separate, see seed.py
+    # create_all never alters an existing table. ponytail: idempotent
+    # hand-written ALTERs for the one schema change so far; move to Alembic
+    # the next time a column changes.
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE handoffs ADD COLUMN IF NOT EXISTS summary JSON"))
+            conn.execute(text("ALTER TABLE handoffs ALTER COLUMN customer_phone DROP NOT NULL"))
     await broadcaster.start()
     yield
     await broadcaster.stop()

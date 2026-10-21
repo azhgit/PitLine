@@ -21,3 +21,20 @@ def test_list_handoffs_sorted_newest_first(client):
     assert resp.status_code == 200
     reasons = [h["reason"] for h in resp.json()]
     assert reasons == ["cannot_verify_caller", "cannot_understand_caller"]
+
+
+def test_handoff_stores_summary(client):
+    summary = {"verification": {"caller_id_verified": True}, "summary": "Brakes grinding, no slots."}
+    resp = client.post(
+        "/handoffs",
+        json={"customer_phone": "555-0101", "reason": "urgent_no_availability", "summary": summary},
+    )
+    assert resp.json()["summary"] == summary
+    assert client.get("/handoffs").json()[0]["summary"] == summary
+
+
+def test_unverified_handoff_logged_without_sms(client):
+    resp = client.post("/handoffs", json={"reason": "cannot_verify_caller"})
+    assert resp.status_code == 200
+    assert resp.json()["customer_phone"] is None
+    assert client.get("/jobs", params={"status": "pending"}).json() == []

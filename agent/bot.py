@@ -302,8 +302,24 @@ def build_tool_schemas() -> list[FunctionSchema]:
                     "enum": list(TRANSFER_MESSAGES.keys()),
                     "description": "Why the call is being transferred.",
                 },
+                "summary": {
+                    "type": "string",
+                    "description": (
+                        "One or two sentences for the service advisor taking "
+                        "over: what the caller needs and what's already been "
+                        "tried. Only what the caller said or a tool returned."
+                    ),
+                },
+                "vehicle": {
+                    "type": "string",
+                    "description": "Make/model/year as the caller stated it, if they did.",
+                },
+                "symptom": {
+                    "type": "string",
+                    "description": "The problem in the caller's words, if they described one.",
+                },
             },
-            required=["reason"],
+            required=["reason", "summary"],
         ),
         FunctionSchema(
             name="end_call",
@@ -365,6 +381,22 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # that rebook - not any unrelated future booking in the same call -
     # skips the DMS's per-phone rate limit. See dms/appointments.py.
     _reschedule_state = {"exempt_next_booking": False}
+    # Every tool result this call, recorded by code (see logged() below) so
+    # a handoff's record of what was tried never depends on the LLM.
+    _tool_log: list[dict] = []
+
+    def logged(name, handler):
+        async def wrapper(params: FunctionCallParams):
+            original = params.result_callback
+
+            async def record(result, **kwargs):
+                _tool_log.append({"tool": name, "args": params.arguments, "result": result})
+                await original(result, **kwargs)
+
+            params.result_callback = record
+            await handler(params)
+
+        return wrapper
 
     async def get_verified_caller_number() -> str | None:
         if "value" not in _caller_number_cache:
@@ -500,20 +532,28 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         await llm.push_frame(TTSSpeakFrame(text=message), FrameDirection.DOWNSTREAM)
         # Logs the Handoff simulation to the DMS, which enqueues its
         # Follow-up job (handoff SMS) in the same DB transaction - see
-        # dms/handoffs.py and ADR-0002. Best-effort: no verified caller
-        # number, or a DMS error, means no way to text them, not a reason
-        # to fail the call itself.
+        # dms/handoffs.py and ADR-0002. Best-effort: a DMS error is logged,
+        # not a reason to fail the call itself.
+        # Logged even unverified (customer_phone None, no SMS) - that's
+        # the handoff the advisor most needs to see. Verification and
+        # tool_results come from code; only summary/caller_stated are the
+        # LLM's words, and are labelled that way.
         caller_number = await get_verified_caller_number()
-        if caller_number:
-            try:
-                response = await dms_client.post(
-                    "/handoffs", json={"customer_phone": caller_number, "reason": reason}
-                )
-                response.raise_for_status()
-            except httpx.HTTPError as e:
-                logger.error(f"DMS handoff logging failed: {e}")
-        else:
-            logger.warning("transfer_and_end_call: no verified caller number, skipping Handoff log")
+        args = params.arguments
+        summary = {
+            "summary": args.get("summary"),
+            "caller_stated": {"vehicle": args.get("vehicle"), "symptom": args.get("symptom")},
+            "verification": {"caller_id_verified": bool(caller_number), "method": "twilio_caller_id"},
+            "tool_results": _tool_log,
+        }
+        try:
+            response = await dms_client.post(
+                "/handoffs",
+                json={"customer_phone": caller_number, "reason": reason, "summary": summary},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error(f"DMS handoff logging failed: {e}")
         await llm.push_frame(EndFrame(reason=reason), FrameDirection.DOWNSTREAM)
         await params.result_callback(
             {"transferred": True}, properties=FunctionCallResultProperties(run_llm=False)
@@ -530,10 +570,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             {"closing": True}, properties=FunctionCallResultProperties(run_llm=False)
         )
 
-    llm.register_function("check_availability", check_availability)
-    llm.register_function("book_appointment", book_appointment)
-    llm.register_function("find_appointment", find_appointment)
-    llm.register_function("cancel_appointment", cancel_appointment)
+    llm.register_function("check_availability", logged("check_availability", check_availability))
+    llm.register_function("book_appointment", logged("book_appointment", book_appointment))
+    llm.register_function("find_appointment", logged("find_appointment", find_appointment))
+    llm.register_function("cancel_appointment", logged("cancel_appointment", cancel_appointment))
     llm.register_function("transfer_and_end_call", transfer_and_end_call)
     llm.register_function("end_call", end_call)
 

@@ -84,8 +84,14 @@ class Handoff(Base):
     __tablename__ = "handoffs"
 
     id = Column(Integer, primary_key=True)
-    customer_phone = Column(String, nullable=False)
+    # Null when the caller's number couldn't be verified - exactly the
+    # handoff the advisor most needs to see, so it's still logged.
+    customer_phone = Column(String, nullable=True)
     reason = Column(String, nullable=False)  # matches call_transfer.py's TRANSFER_MESSAGES keys
+    # What the advisor picks up with. Facts the agent's code owns
+    # (verification, tool_results) are kept apart from what the LLM wrote
+    # (summary, caller_stated) - see agent/bot.py's transfer_and_end_call.
+    summary = Column(JSON, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 

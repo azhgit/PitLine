@@ -18,12 +18,24 @@ type Appointment = {
   status: string;
 };
 
+// summary: verification/tool_results are written by the agent's code;
+// summary/caller_stated are the LLM's words (agent/bot.py transfer_and_end_call).
+type HandoffSummaryData = {
+  summary: string | null;
+  caller_stated: { vehicle: string | null; symptom: string | null };
+  verification: { caller_id_verified: boolean; method: string };
+  tool_results: { tool: string; args: Record<string, unknown>; result: Record<string, unknown> }[];
+};
+
 type Handoff = {
   id: number;
-  customer_phone: string;
+  customer_phone: string | null; // null = caller couldn't be verified
   reason: string;
+  summary: HandoffSummaryData | null; // null on handoffs logged before summaries existed
   created_at: string;
 };
+
+const UNVERIFIED_CALLER = "Unverified caller";
 
 type Technician = {
   id: number;
@@ -380,7 +392,7 @@ function HandoffCard({
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-medium">{handoff.customer_phone}</span>
+        <span className="font-medium">{handoff.customer_phone ?? UNVERIFIED_CALLER}</span>
         <span className="text-xs text-neutral-500">{formatUtcAsDealershipTime(handoff.created_at)}</span>
       </div>
       <p className="text-sm text-neutral-400">
@@ -401,7 +413,7 @@ function SummaryModal({ selection, onClose }: { selection: Selection; onClose: (
   }, [onClose]);
 
   const title =
-    selection.type === "appointment" ? selection.appointment.customer_name : selection.handoff.customer_phone;
+    selection.type === "appointment" ? selection.appointment.customer_name : (selection.handoff.customer_phone ?? UNVERIFIED_CALLER);
 
   return (
     <div
@@ -478,14 +490,64 @@ function AppointmentSummary({
   );
 }
 
+// One line per tool call, from code-recorded results - what the agent
+// actually tried before handing off.
+function describeToolResult({ tool, args, result }: HandoffSummaryData["tool_results"][number]): string {
+  if ("error" in result) return `${tool}: ${String(result.error)}`;
+  if (tool === "check_availability") {
+    const slots = (result.slots as unknown[] | undefined) ?? [];
+    return `Checked ${String(args.urgency).replace("_", "-")} availability: ${slots.length} slot(s)`;
+  }
+  if (tool === "find_appointment") {
+    if (result.verified === false) return "Appointment lookup: caller not verified";
+    return `Appointment lookup: ${((result.appointments as unknown[]) ?? []).length} found`;
+  }
+  if (tool === "book_appointment") return "Booked an appointment";
+  if (tool === "cancel_appointment") return "Cancelled an appointment";
+  return tool;
+}
+
 function HandoffSummary({ handoff }: { handoff: Handoff }) {
+  const s = handoff.summary;
   return (
     <div>
       <SummaryRow label="Reason" value={REASON_LABELS[handoff.reason] ?? handoff.reason} />
+      {s && (
+        <SummaryRow
+          label="Caller ID"
+          value={
+            s.verification.caller_id_verified ? (
+              <span className="rounded bg-emerald-900/60 px-2 py-0.5 text-xs text-emerald-300">Verified</span>
+            ) : (
+              <span className="rounded bg-amber-900/60 px-2 py-0.5 text-xs text-amber-300">Not verified</span>
+            )
+          }
+        />
+      )}
+      {s?.caller_stated.vehicle && <SummaryRow label="Vehicle (caller said)" value={s.caller_stated.vehicle} />}
+      {s?.caller_stated.symptom && <SummaryRow label="Symptom (caller said)" value={s.caller_stated.symptom} />}
       <SummaryRow label="Time" value={formatUtcAsDealershipTime(handoff.created_at)} />
       <SummaryRow label="Handoff #" value={<span className="font-mono">{handoff.id}</span>} />
+      {s?.summary && (
+        <div className="mt-4">
+          <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">Agent summary</p>
+          <p className="text-sm text-neutral-100">{s.summary}</p>
+        </div>
+      )}
+      {s && s.tool_results.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">What the agent tried</p>
+          <ul className="list-disc pl-5 text-sm text-neutral-300">
+            {s.tool_results.map((t, i) => (
+              <li key={i}>{describeToolResult(t)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="mt-3 text-xs text-neutral-500">
-        Handoff SMS queued to this number - no real transfer occurred (simulated).
+        {handoff.customer_phone
+          ? "Handoff SMS queued to this number - no real transfer occurred (simulated)."
+          : "No verified number, so no SMS was queued - no real transfer occurred (simulated)."}
       </p>
     </div>
   );

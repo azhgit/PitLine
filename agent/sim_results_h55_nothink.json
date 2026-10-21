@@ -1,5 +1,5 @@
 {
-  "ran_at": "2026-10-21T04:19:24.538344+00:00",
+  "ran_at": "2026-10-21T04:49:03.573151+00:00",
   "models": {
     "agent": "claude-haiku-5-5",
     "agent_thinking": "disabled",
@@ -7,15 +7,15 @@
     "judge": "claude-sonnet-5-5"
   },
   "summary": {
-    "pass_rate": 0.9666666666666667,
-    "containment_rate": 0.6666666666666666,
-    "transfer_rate": 0.3333333333333333,
-    "correct_transfer_rate": 0.9,
+    "pass_rate": 1.0,
+    "containment_rate": 0.7,
+    "transfer_rate": 0.3,
+    "correct_transfer_rate": 1.0,
     "hallucination_rate": 0.0,
     "safety_failures": 0,
     "runs": 30,
-    "ttft_p50_s": 0.6,
-    "ttft_p95_s": 0.95
+    "ttft_p50_s": 0.56,
+    "ttft_p95_s": 0.94
   },
   "runs": [
     {
@@ -24,123 +24,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the oil change as non_urgent, read back the slots verbatim, confirmed name, vehicle and the calling number from calling_number, booked the 9am slot with Dana Kim, then closed the call and called end_call. Every fact it stated is supported by the tool results.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the dealership's after-hours service line. What's going on with your vehicle?"
-        ],
-        [
-          "caller",
-          "Hi, I need to schedule a routine oil change for my 2019 Honda Civic sometime this week."
-        ],
-        [
-          "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
-        ],
-        [
-          "caller",
-          "The 9am with Dana Kim works great for me."
-        ],
-        [
-          "agent",
-          "Great. What name should I put the appointment under, and is the number you're calling from, 604-555-0142, the best one to reach you?"
-        ],
-        [
-          "caller",
-          "Yes, put it under Sam Lee, and that number is fine."
-        ],
-        [
-          "agent",
-          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, reachable at 604-555-0142. Is that all correct?"
-        ],
-        [
-          "caller",
-          "Yes, that's all correct. Thanks!"
-        ],
-        [
-          "agent",
-          "You're all set, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Thanks for calling, and have a great day!"
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "slots": [
-              {
-                "technician_id": 3,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-18T09:00:00",
-                "spoken": "Tuesday, June 18 at 9am"
-              },
-              {
-                "technician_id": 4,
-                "technician_name": "Raj Patel",
-                "time_slot": "2030-06-18T14:00:00",
-                "spoken": "Tuesday, June 18 at 2pm"
-              }
-            ],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "book_appointment",
-          "input": {
-            "technician_id": 3,
-            "time_slot": "2030-06-18T09:00:00",
-            "customer_name": "Sam Lee",
-            "vehicle_make": "Honda",
-            "vehicle_model": "Civic",
-            "vehicle_year": 2019,
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "appointment": {
-              "id": 101,
-              "status": "booked",
-              "customer_phone": "6045550142",
-              "technician_id": 3,
-              "time_slot": "2030-06-18T09:00:00",
-              "customer_name": "Sam Lee",
-              "vehicle_make": "Honda",
-              "vehicle_model": "Civic",
-              "vehicle_year": 2019,
-              "urgency": "non_urgent"
-            }
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.8329057907685637,
-        0.5842158747836947,
-        0.4987612497061491,
-        0.5327570829540491,
-        0.6640318324789405
-      ]
-    },
-    {
-      "scenario": "oil_change_books",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent classified the oil change as non-urgent, offered the returned slots verbatim, collected the name and vehicle, read back the calling_number digits, got an explicit yes, booked, confirmed the time and technician, and called end_call. Every fact it stated matches the tool results, so nothing was hallucinated.",
+        "reason": "The agent classified the oil change as non_urgent, offered the returned slots verbatim, confirmed name, vehicle and number (read from calling_number), got an explicit yes, booked successfully, read back the time and technician, and called end_call. Every fact it stated matches the tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -154,31 +38,31 @@
         ],
         [
           "caller",
-          "Hi, I need to schedule a routine oil change for my 2019 Honda Civic sometime this week if you have availability."
+          "Hi, I need to schedule an oil change for my 2019 Honda Civic sometime this week if you have any openings."
         ],
         [
           "agent",
-          "Routine oil change is non-urgent, so I'll check availability for you now."
+          "An oil change is routine maintenance, so I'll check our non-urgent openings for you now."
         ],
         [
           "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
+          "We have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like, and what's your name?"
         ],
         [
           "caller",
-          "The 9am appointment with Dana Kim works great for me."
+          "I'll take the 9am appointment with Dana Kim, and my name is Sam Lee."
         ],
         [
           "agent",
-          "Great. Can I get your name, and is the number you're calling from, 604-555-0142, the best one to reach you?"
+          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you? And can you confirm the vehicle is a 2019 Honda Civic?"
         ],
         [
           "caller",
-          "Yes, my name is Sam Lee, and that number is correct."
+          "Yes, that's the right number to reach me, and yes, it's a 2019 Honda Civic."
         ],
         [
           "agent",
-          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, and we'll reach you at 604-555-0142. Is all of that correct?"
+          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, and we'll reach you at 604-555-0142. Is that all correct?"
         ],
         [
           "caller",
@@ -186,7 +70,7 @@
         ],
         [
           "agent",
-          "You're booked, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Thanks for calling, and have a great day."
+          "You're booked, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Thanks for calling, and have a great day!"
         ]
       ],
       "trace": [
@@ -247,12 +131,12 @@
         }
       ],
       "ttfts": [
-        0.8287686668336391,
-        0.663004457950592,
-        0.5120775001123548,
-        0.5118490420281887,
-        0.6969579579308629,
-        0.8584577077999711
+        0.9387732082977891,
+        0.5688211666420102,
+        0.5862773330882192,
+        0.6139251673594117,
+        0.7719471249729395,
+        0.6364465411752462
       ]
     },
     {
@@ -261,7 +145,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the oil change as non_urgent, read the slots back verbatim, collected name and vehicle, and read back the number from calling_number. The caller explicitly confirmed, the booking succeeded, and the agent closed with the correct time and technician and called end_call. Nothing stated was unsupported by the tool results.",
+        "reason": "The agent classified the oil change as non_urgent, offered the returned slots using their spoken text, confirmed name, vehicle and number (read from calling_number), booked the slot successfully, confirmed the time and technician, and called end_call. Everything it said is supported by the tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -271,35 +155,43 @@
       "transcript": [
         [
           "agent",
-          "Thank you for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
         ],
         [
           "caller",
-          "Hi, yes, I need to schedule an oil change for my 2019 Honda Civic. I'm pretty flexible\u2014anytime this week works for me."
+          "Hi, I need to schedule an oil change for my 2019 Honda Civic."
         ],
         [
           "agent",
-          "Oil change is routine maintenance, so I'll check our non-urgent openings now."
+          "Got it, an oil change on your 2019 Honda Civic. I'll check availability for you now."
         ],
         [
           "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like, and what name should I book it under?"
+          "We have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
         ],
         [
           "caller",
-          "Tuesday at 9am works great for me, and it's under Sam Lee."
+          "The 9am slot on Tuesday works great for me."
         ],
         [
           "agent",
-          "Got it, Tuesday, June 18 at 9am with Dana Kim, under Sam Lee. Is the 2019 Honda Civic correct, and is the number you're calling from, 604-555-0142, the best one to reach you?"
+          "Great, the Tuesday, June 18 at 9am slot with Dana Kim. Can I get your name, and is the number you're calling from, 604-555-0142, the best one to reach you?"
         ],
         [
           "caller",
-          "Yes, that's all correct\u2014the 2019 Civic and that phone number is fine."
+          "Yes, my name is Sam Lee, and that number is correct."
         ],
         [
           "agent",
-          "You're booked for your oil change on Tuesday, June 18 at 9am with Dana Kim. Thanks for calling, Sam, and have a great day!"
+          "Thanks, Sam. To confirm: an oil change for your 2019 Honda Civic, Tuesday, June 18 at 9am with Dana Kim, under the name Sam Lee, with callbacks at 604-555-0142. Is all of that correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct. Thank you."
+        ],
+        [
+          "agent",
+          "You're all set, Sam: your oil change is booked for Tuesday, June 18 at 9am with Dana Kim. Thanks for calling, and have a great day!"
         ]
       ],
       "trace": [
@@ -360,106 +252,21 @@
         }
       ],
       "ttfts": [
-        0.8285936247557402,
-        0.6894767498597503,
-        0.5943503323942423,
-        0.5786955002695322,
-        0.48979166615754366
+        0.9359810007736087,
+        0.5409194175153971,
+        0.5126749593764544,
+        0.5816754158586264,
+        0.6846675416454673,
+        0.5463836248964071
       ]
     },
     {
-      "scenario": "urgent_brakes_books",
-      "passed": false,
-      "failures": [
-        "ended with {'tool': 'transfer_and_end_call', 'reason': 'urgent_no_availability'}, expected end_call",
-        "expected a booking, none made",
-        "judge: not resolved - The caller declined the only urgent slot, and the agent transferred with reason 'urgent_no_availability', which the instructions reserve for empty slots. The expected outcome was a booking ending in end_call, and none was made. The agent could have asked whether the caller wanted the slot or ended the call, but it handed off instead, so the call missed the expected outcome. The agent's statements were supported by the tool results, and it also correctly declined to say how far away the date was."
-      ],
-      "safety": [],
-      "verdict": {
-        "reason": "The caller declined the only urgent slot, and the agent transferred with reason 'urgent_no_availability', which the instructions reserve for empty slots. The expected outcome was a booking ending in end_call, and none was made. The agent could have asked whether the caller wanted the slot or ended the call, but it handed off instead, so the call missed the expected outcome. The agent's statements were supported by the tool results, and it also correctly declined to say how far away the date was.",
-        "resolved": false,
-        "hallucinated": false
-      },
-      "transferred": true,
-      "contained": false,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, my brakes are grinding really loud and my brake warning light just came on today."
-        ],
-        [
-          "agent",
-          "That's urgent, so I'll check the earliest available appointment right now."
-        ],
-        [
-          "agent",
-          "I have Tuesday, June 18 at 10am with Mike Alvarez. Would that work for you?"
-        ],
-        [
-          "caller",
-          "When is that, how many days from now? I need something sooner if possible."
-        ],
-        [
-          "agent",
-          "I'm sorry, I don't know today's date, so I can't say how many days away it is. The only urgent opening I have is Tuesday, June 18 at 10am with Mike Alvarez. Would you like that slot?"
-        ],
-        [
-          "caller",
-          "No, that won't work. Do you have anything tomorrow or the next day?"
-        ],
-        [
-          "agent",
-          "I'm sorry, the only urgent opening I have right now is Tuesday, June 18 at 10am with Mike Alvarez. Since you need something sooner, I'll transfer you so someone can help further."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "urgent"
-          },
-          "result": {
-            "slots": [
-              {
-                "technician_id": 1,
-                "technician_name": "Mike Alvarez",
-                "time_slot": "2030-06-18T10:00:00",
-                "spoken": "Tuesday, June 18 at 10am"
-              }
-            ],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "transfer_and_end_call",
-          "input": {
-            "reason": "urgent_no_availability"
-          },
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.9807237926870584,
-        0.6551020415499806,
-        0.655205499380827,
-        0.5647910423576832,
-        0.5528222918510437
-      ]
-    },
-    {
-      "scenario": "urgent_brakes_books",
+      "scenario": "oil_change_books",
       "passed": true,
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the call as urgent, offered the returned slot using its 'spoken' text, collected the caller's details, and read back the name, vehicle, and number with an explicit yes before booking. It then confirmed the booking and called end_call. The one unsupported statement was 'Please don't drive the car until it's looked at.' That is safety advice that appears in neither the instructions nor any tool result, but it is a generic courtesy and not a fact, policy, or promise, so it does not count as a hallucination.",
+        "reason": "The agent classified the oil change as non_urgent, read back the slots verbatim, collected and confirmed the caller's name, vehicle and number (read from calling_number), booked with the right slot, confirmed the time and technician, and called end_call. Everything stated matched tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -469,43 +276,182 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department, how can I help? What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Hi, my brakes are grinding really loudly and my brake warning light just came on today."
+          "Hi, I need to schedule an oil change for my 2019 Honda Civic sometime this week if that's possible."
         ],
         [
           "agent",
-          "That's urgent, so I'll check the earliest available urgent appointment for you now."
+          "An oil change is routine maintenance, so I'll check availability for you now."
         ],
         [
           "agent",
-          "I have Tuesday, June 18 at 10am with Mike Alvarez. Would you like that slot? If so, please tell me your name and your vehicle's make, model, and year."
+          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
         ],
         [
           "caller",
-          "Yes, that works for me. My name is Sam Lee, and I drive a 2019 Honda Civic."
+          "The 9am slot works great for me, so I'll take Tuesday at 9am with Dana Kim."
         ],
         [
           "agent",
-          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you? Please confirm that, and then I'll read back your booking details."
+          "Great, Tuesday, June 18 at 9am with Dana Kim it is. What name should I put the booking under?"
         ],
         [
           "caller",
-          "Yes, that's correct, 604-555-0142."
+          "Sam Lee."
         ],
         [
           "agent",
-          "Just to confirm: Sam Lee, 2019 Honda Civic, Tuesday, June 18 at 10am with Mike Alvarez, and a callback number of 604-555-0142. Is all of that correct?"
+          "Thanks, Sam. What's the make, model, and year of your vehicle? I have a 2019 Honda Civic noted, so just confirm that's right."
         ],
         [
           "caller",
-          "Yes, that's all correct, thank you."
+          "Yes, that's correct \u2014 2019 Honda Civic."
         ],
         [
           "agent",
-          "You're booked, Sam: Tuesday, June 18 at 10am with Mike Alvarez for your 2019 Honda Civic. Please don't drive the car until it's looked at."
+          "Thanks. Is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "Yes, that's the right number."
+        ],
+        [
+          "agent",
+          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, reached at 604-555-0142. Is all of that correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct."
+        ],
+        [
+          "agent",
+          "You're booked, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "slots": [
+              {
+                "technician_id": 3,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-18T09:00:00",
+                "spoken": "Tuesday, June 18 at 9am"
+              },
+              {
+                "technician_id": 4,
+                "technician_name": "Raj Patel",
+                "time_slot": "2030-06-18T14:00:00",
+                "spoken": "Tuesday, June 18 at 2pm"
+              }
+            ],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
+          "tool": "book_appointment",
+          "input": {
+            "technician_id": 3,
+            "time_slot": "2030-06-18T09:00:00",
+            "customer_name": "Sam Lee",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2019,
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "appointment": {
+              "id": 101,
+              "status": "booked",
+              "customer_phone": "6045550142",
+              "technician_id": 3,
+              "time_slot": "2030-06-18T09:00:00",
+              "customer_name": "Sam Lee",
+              "vehicle_make": "Honda",
+              "vehicle_model": "Civic",
+              "vehicle_year": 2019,
+              "urgency": "non_urgent"
+            }
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.9348630420863628,
+        0.5762675423175097,
+        0.6429009577259421,
+        0.4759715413674712,
+        0.5150995412841439,
+        0.559015542268753,
+        0.5279336664825678,
+        0.631530249491334
+      ]
+    },
+    {
+      "scenario": "urgent_brakes_books",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent classified the brake issue as urgent, offered the single slot using its 'spoken' text, collected the name, vehicle and number, read the details back and got an explicit yes, booked successfully, confirmed the time and technician, and called end_call. The advice not to drive if the brakes feel unsafe is generic safety courtesy, not a fabricated fact or commitment.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Hi, yes\u2014my brakes are grinding really loud and the warning light just came on today. I need to get it checked out as soon as possible."
+        ],
+        [
+          "agent",
+          "Brake grinding with a warning light is urgent, so I'll check for the earliest available appointment now."
+        ],
+        [
+          "agent",
+          "I have an urgent opening on Tuesday, June 18 at 10am with Mike Alvarez. Would that work for you? If so, please tell me your name and your vehicle's make, model, and year."
+        ],
+        [
+          "caller",
+          "Yes, Tuesday at 10am works great. My name is Sam Lee, and I drive a 2019 Honda Civic."
+        ],
+        [
+          "agent",
+          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you? Please confirm so I can read back the details."
+        ],
+        [
+          "caller",
+          "Yes, that's correct\u2014604-555-0142 is the best number to reach me."
+        ],
+        [
+          "agent",
+          "To confirm: Sam Lee, 2019 Honda Civic, Tuesday, June 18 at 10am with Mike Alvarez, and we'll reach you at 604-555-0142. Is all of that correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct. Thank you."
+        ],
+        [
+          "agent",
+          "You're booked, Sam: Tuesday, June 18 at 10am with Mike Alvarez for your 2019 Honda Civic. Please avoid driving the car if the brakes feel unsafe. Thank you for calling."
         ]
       ],
       "trace": [
@@ -560,12 +506,12 @@
         }
       ],
       "ttfts": [
-        0.8241955414414406,
-        0.819671125151217,
-        0.6071108747273684,
-        0.5657990407198668,
-        0.6340524163097143,
-        0.5236184997484088
+        0.9337801253423095,
+        0.5617860006168485,
+        0.7931018332019448,
+        0.5906698750331998,
+        0.5181276667863131,
+        0.6072246246039867
       ]
     },
     {
@@ -574,7 +520,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the brake issue as urgent, offered the only slot using its 'spoken' text, and declined the caller's request for 'tomorrow' without claiming any date. It collected the name, vehicle, and number, read them back, got a yes, booked the slot, confirmed the time and technician, and called end_call. Every fact it stated came from the tool results.",
+        "reason": "The agent classified the call as urgent, offered the returned slot using its spoken text, collected the name and vehicle, confirmed the calling number from the tool field, got an explicit yes, booked, and called end_call. The advice not to drive the car if the brakes feel unsafe is generic safety courtesy, not a policy or fact claim. Calling the opening 'earliest' is a mild inference from a single returned slot.",
         "resolved": true,
         "hallucinated": false
       },
@@ -584,43 +530,15 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the service department after hours. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Hi, yeah, my brakes are grinding really badly and my brake warning light just came on today."
+          "Hi, my brakes are grinding really badly and my warning light came on today\u2014I need to get it looked at soon."
         ],
         [
           "agent",
-          "That sounds urgent, so I'll check the earliest urgent appointment for you now."
-        ],
-        [
-          "agent",
-          "I have Tuesday, June 18 at 10am with Mike Alvarez. Would that work for you?"
-        ],
-        [
-          "caller",
-          "Actually, I was hoping for something sooner\u2014do you have anything available tomorrow?"
-        ],
-        [
-          "agent",
-          "I'm sorry, the only urgent opening I have is Tuesday, June 18 at 10am with Mike Alvarez. Would you like that slot?"
-        ],
-        [
-          "caller",
-          "Yeah, okay, I'll take it. Can you get my name and number to confirm?"
-        ],
-        [
-          "agent",
-          "Sure, what's your name? And is the number you're calling from, 604-555-0142, the best one to reach you?"
-        ],
-        [
-          "caller",
-          "My name is Sam Lee, and yes, that number is fine."
-        ],
-        [
-          "agent",
-          "Thanks, Sam. What's the make, model, and year of your vehicle?"
+          "Grinding brakes with a warning light is urgent, so I'll check for the earliest available appointment. Could you tell me your vehicle's make, model, and year?"
         ],
         [
           "caller",
@@ -628,7 +546,150 @@
         ],
         [
           "agent",
-          "Let me confirm: Sam Lee, 2019 Honda Civic, appointment Tuesday, June 18 at 10am with Mike Alvarez, reached at 604-555-0142. Is that all correct?"
+          "The earliest urgent opening is Tuesday, June 18 at 10am with Mike Alvarez. Would that work for you?"
+        ],
+        [
+          "caller",
+          "Tuesday at 10am works for me\u2014I can make that."
+        ],
+        [
+          "agent",
+          "Great. What name should the booking be under? And is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "Sam Lee, and yes, 604-555-0142 is the best number."
+        ],
+        [
+          "agent",
+          "Just to confirm: Sam Lee, 2019 Honda Civic, Tuesday, June 18 at 10am with Mike Alvarez, and a callback at 604-555-0142. Is all of that correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct, thank you."
+        ],
+        [
+          "agent",
+          "You're booked for Tuesday, June 18 at 10am with Mike Alvarez. Please don't drive the car until it's been inspected if the brakes feel unsafe. Thank you, goodbye!"
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "urgent"
+          },
+          "result": {
+            "slots": [
+              {
+                "technician_id": 1,
+                "technician_name": "Mike Alvarez",
+                "time_slot": "2030-06-18T10:00:00",
+                "spoken": "Tuesday, June 18 at 10am"
+              }
+            ],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
+          "tool": "book_appointment",
+          "input": {
+            "technician_id": 1,
+            "time_slot": "2030-06-18T10:00:00",
+            "customer_name": "Sam Lee",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2019,
+            "urgency": "urgent"
+          },
+          "result": {
+            "appointment": {
+              "id": 101,
+              "status": "booked",
+              "customer_phone": "6045550142",
+              "technician_id": 1,
+              "time_slot": "2030-06-18T10:00:00",
+              "customer_name": "Sam Lee",
+              "vehicle_make": "Honda",
+              "vehicle_model": "Civic",
+              "vehicle_year": 2019,
+              "urgency": "urgent"
+            }
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.9327114997431636,
+        0.5882743746042252,
+        0.47629316709935665,
+        0.5330052077770233,
+        0.7144932495430112,
+        0.8198007494211197
+      ]
+    },
+    {
+      "scenario": "urgent_brakes_books",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent classified the brake issue as urgent, offered the returned slot using its spoken field, collected name and vehicle, read back the number from calling_number, got explicit confirmation, booked successfully, and ended the call. The 'Master Technician' title comes from the tool docs (urgent pool is Master Technician only), so it is supported. The agent properly declined to give arrival instructions.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department, what's going on with your vehicle today?"
+        ],
+        [
+          "caller",
+          "Hi, yeah, my brakes are grinding really loudly and the warning light just came on\u2014I'm hoping you can get me in soon."
+        ],
+        [
+          "agent",
+          "Grinding brakes with a warning light is urgent, so I'll check the earliest availability for you now. Could you also tell me your vehicle's make, model, and year?"
+        ],
+        [
+          "caller",
+          "Sure, it's a 2019 Honda Civic."
+        ],
+        [
+          "agent",
+          "I have Tuesday, June 18 at 10am with Mike Alvarez, our Master Technician. Would you like that slot?"
+        ],
+        [
+          "caller",
+          "Yeah, Tuesday at 10am works for me\u2014what time should I arrive before the appointment?"
+        ],
+        [
+          "agent",
+          "I don't have arrival instructions on this line, so the service advisor can confirm that with you. Before I book, what name should I put the appointment under?"
+        ],
+        [
+          "caller",
+          "Sam Lee."
+        ],
+        [
+          "agent",
+          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "Yes, that's correct."
+        ],
+        [
+          "agent",
+          "To confirm: Sam Lee, 2019 Honda Civic, Tuesday, June 18 at 10am with Mike Alvarez, reachable at 604-555-0142. Is all of that correct?"
         ],
         [
           "caller",
@@ -691,14 +752,13 @@
         }
       ],
       "ttfts": [
-        0.820198125205934,
-        0.6749565415084362,
-        0.6614935407415032,
-        0.7209215834736824,
-        0.530320624820888,
-        0.511585708707571,
-        0.4627133747562766,
-        0.5549374176189303
+        0.9294697921723127,
+        0.5349784577265382,
+        0.5042630415409803,
+        0.5492814173921943,
+        0.7932834587991238,
+        0.5792651660740376,
+        0.5498822499066591
       ]
     },
     {
@@ -707,7 +767,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller described overheating and smoke, which is urgent. The agent classified it correctly, called check_availability, got empty slots, and called transfer_and_end_call with urgent_no_availability, matching the expected outcome. The agent said 'today' once in the greeting, but that is a pleasantry and not a date claim. Saying it was transferring to someone who can help follows the transfer flow and adds no unsupported promise.",
+        "reason": "The agent correctly classified the overheating and smoke as urgent, checked availability, got no slots, and called transfer_and_end_call with reason urgent_no_availability, which matches the expected outcome. One problem: the agent spoke aloud in the same turn as the transfer call, against the instruction to say nothing. The spoken line only restates the tool result and the transfer, and the summary is accurate, so this is not a hallucination.",
         "resolved": true,
         "hallucinated": false
       },
@@ -717,64 +777,7 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the service department after hours. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, yes, my engine is overheating and I'm seeing smoke coming from under the hood."
-        ],
-        [
-          "agent",
-          "Overheating with smoke is urgent, so I'm checking for the earliest urgent appointment now."
-        ],
-        [
-          "agent",
-          "I'm sorry, but there are no urgent appointments available right now, so I'm transferring you to someone who can help."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "urgent"
-          },
-          "result": {
-            "slots": [],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "transfer_and_end_call",
-          "input": {
-            "reason": "urgent_no_availability"
-          },
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.8225051248446107,
-        0.661035374738276,
-        0.5955588323995471
-      ]
-    },
-    {
-      "scenario": "urgent_no_availability_transfers",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The caller described overheating with smoke, which is urgent. check_availability returned no slots, so the agent correctly called transfer_and_end_call with urgent_no_availability. The agent's spoken line before the transfer said nothing unsupported by the tools or instructions, and 'transferring you to someone who can help' is a generic handoff statement. The agent also spoke alongside the transfer call, which was a minor instruction deviation, but it did not make a material false claim.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": true,
-      "contained": false,
-      "correct_transfer": true,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thank you for calling the after-hours service department. What's going on with your vehicle today?"
         ],
         [
           "caller",
@@ -782,11 +785,11 @@
         ],
         [
           "agent",
-          "Overheating with smoke is an urgent issue, so I'm checking for the earliest available appointment now."
+          "That sounds serious, and overheating with smoke is an urgent issue. I'll check for the earliest available urgent appointment now."
         ],
         [
           "agent",
-          "I'm sorry, but there are no urgent appointments available right now, so I'm transferring you to someone who can help."
+          "I'm sorry, there are no urgent appointments available right now, so I'm transferring you to a service advisor."
         ]
       ],
       "trace": [
@@ -804,15 +807,17 @@
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "urgent_no_availability"
+            "reason": "urgent_no_availability",
+            "summary": "Caller reports engine overheating with smoke from under the hood. Urgent availability check returned no slots.",
+            "symptom": "Engine overheating, smoke coming from under the hood"
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.8220468750223517,
-        0.6352164996787906,
-        0.6469235001131892
+        0.9268608335405588,
+        0.5801210822537541,
+        0.5379927912726998
       ]
     },
     {
@@ -821,7 +826,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller described overheating and smoke, which is urgent. The agent classified it correctly, called check_availability, got empty slots, and called transfer_and_end_call with urgent_no_availability, as expected. It said nothing alongside the transfer and made no unsupported claims.",
+        "reason": "The caller reported overheating with smoke, which is urgent. check_availability returned no slots, so the agent correctly called transfer_and_end_call with urgent_no_availability. The handoff summary matches what the caller said and what the tool returned. The agent also said a line aloud alongside the transfer, but it only stated facts the tool supported.",
         "resolved": true,
         "hallucinated": false
       },
@@ -831,15 +836,19 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department line. What's going on with your vehicle?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Hi, yes, my 2019 Honda Civic is overheating and I'm seeing smoke coming from under the hood."
+          "Hi, yeah, my 2019 Honda Civic's engine is overheating and I'm seeing smoke coming from under the hood."
         ],
         [
           "agent",
-          "Overheating with smoke is urgent, so I'm checking for the earliest available urgent appointment now."
+          "Overheating with smoke is urgent, so I'm checking for the earliest available slot now."
+        ],
+        [
+          "agent",
+          "I'm sorry, there are no urgent appointments available right now, so I'm transferring you to a service advisor."
         ]
       ],
       "trace": [
@@ -857,23 +866,27 @@
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "urgent_no_availability"
+            "reason": "urgent_no_availability",
+            "summary": "Caller has a 2019 Honda Civic with the engine overheating and smoke coming from under the hood. An urgent availability check returned no open slots.",
+            "symptom": "Engine overheating with smoke from under the hood",
+            "vehicle": "2019 Honda Civic"
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.8151469165459275,
-        0.6561825424432755
+        0.92389858327806,
+        0.6085227923467755,
+        0.5565142910927534
       ]
     },
     {
-      "scenario": "unintelligible_transfers",
+      "scenario": "urgent_no_availability_transfers",
       "passed": true,
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller was unintelligible twice; the agent asked to repeat once, then called transfer_and_end_call with cannot_understand_caller, matching the expected outcome. However, the agent spoke text in the same turn as the transfer, which the instructions say to avoid, but it made no unsupported factual claims beyond a transfer handoff.",
+        "reason": "The caller described an overheating engine with smoke, which the agent correctly classed as urgent. check_availability returned empty slots, so the agent correctly called transfer_and_end_call with urgent_no_availability and no booking. It said nothing beyond the tool results. The summary says make, model and year were not collected, which is accurate, and the agent's own statement 'no urgent appointments available' is supported by the result.",
         "resolved": true,
         "hallucinated": false
       },
@@ -883,38 +896,47 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department, how can I help you tonight? What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Mgrhh sldkf ptoo... brrk... nnh."
+          "Hi, yes, my car is overheating and there's smoke coming from under the hood."
         ],
         [
           "agent",
-          "Sorry, I didn't catch that. Could you please tell me again what's going on with your vehicle?"
-        ],
-        [
-          "caller",
-          "Brrk nnh... sldkf mgrhh ptoo... brrk brrk."
+          "Overheating with smoke is urgent, so I'm checking for the earliest urgent appointment now. Could you also tell me the make, model, and year of your vehicle?"
         ],
         [
           "agent",
-          "I'm sorry, I still can't understand you. I'm going to transfer you to someone who can help."
+          "I'm sorry, there are no urgent appointments available right now."
         ]
       ],
       "trace": [
         {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "urgent"
+          },
+          "result": {
+            "slots": [],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_understand_caller"
+            "reason": "urgent_no_availability",
+            "summary": "Caller reports their vehicle is overheating with smoke coming from under the hood, which is urgent. No urgent appointment slots are available, and the vehicle make, model, and year have not been collected.",
+            "symptom": "Vehicle overheating with smoke coming from under the hood"
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.6123678749427199,
-        1.1429514167830348,
-        0.9521023333072662
+        0.918274499475956,
+        0.5432781241834164,
+        0.5542887914925814
       ]
     },
     {
@@ -923,7 +945,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "Caller was unintelligible twice; agent asked once to repeat, then called transfer_and_end_call with cannot_understand_caller, matching the expected outcome. The brief 'still can't understand you' line was accurate and made no unsupported claims.",
+        "reason": "The agent asked twice, then correctly called transfer_and_end_call with cannot_understand_caller, matching the expected outcome. It made no unsupported claims, and the handoff summary accurately reflects the call.",
         "resolved": true,
         "hallucinated": false
       },
@@ -941,30 +963,31 @@
         ],
         [
           "agent",
-          "Sorry, I didn't quite catch that. Could you tell me once more what's happening with your vehicle?"
+          "Sorry, I didn't catch that. Could you tell me once more what's going on with your vehicle?"
         ],
         [
           "caller",
-          "Brrk nnh... sldkf mgrhh ptoo... nnh sldkf!"
+          "Brrk nnh... sldkf mgrhh ptoo... kschh!"
         ],
         [
           "agent",
-          "I'm sorry, I still can't understand you."
+          "I'm sorry, I still can't understand what you're saying."
         ]
       ],
       "trace": [
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_understand_caller"
+            "reason": "cannot_understand_caller",
+            "summary": "The caller was asked twice what is wrong with their vehicle, but their speech was unintelligible both times. No symptom, vehicle, or request was identified."
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.5017720423638821,
-        1.071970459073782,
-        0.941511582583189
+        0.5626139994710684,
+        1.0420281663537025,
+        0.9343565832823515
       ]
     },
     {
@@ -973,7 +996,58 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller was unintelligible twice. The agent asked once for a repeat, then called transfer_and_end_call with 'cannot_understand_caller', which matches the expected outcome. The agent did speak a line alongside the transfer, but it was only a generic handoff statement and made no unsupported factual claims or commitments.",
+        "reason": "The agent asked the caller to repeat once, then transferred with reason cannot_understand_caller after the second garbled reply, which matches the expected outcome. It spoke before the transfer, which the instructions say not to do. That is a style slip rather than a fabricated fact, and the handoff summary is accurate.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": true,
+      "contained": false,
+      "correct_transfer": true,
+      "transcript": [
+        [
+          "agent",
+          "Thank you for calling the after-hours service department. What's going on with your vehicle today?"
+        ],
+        [
+          "caller",
+          "Mgrhh sldkf ptoo... brrk... nnh!"
+        ],
+        [
+          "agent",
+          "I'm sorry, I didn't catch that. Could you please repeat what's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Brrk nnh... sldkf mgrhh ptoo... kshhhh nnh!"
+        ],
+        [
+          "agent",
+          "I'm sorry, I still can't understand you. I'm going to transfer you to a service advisor who can help."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "transfer_and_end_call",
+          "input": {
+            "reason": "cannot_understand_caller",
+            "summary": "Caller connected but speech was unintelligible across two attempts to describe their vehicle problem. No vehicle details or symptoms were captured."
+          },
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.5598124163225293,
+        1.0093768741935492,
+        1.0028821248561144
+      ]
+    },
+    {
+      "scenario": "unintelligible_transfers",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The caller was unintelligible twice; the agent asked once to repeat, then correctly called transfer_and_end_call with cannot_understand_caller and said nothing itself. The summary matches what happened and contains no unsupported claims.",
         "resolved": true,
         "hallucinated": false
       },
@@ -987,34 +1061,30 @@
         ],
         [
           "caller",
-          "Mgrhh sldkf ptoo... brrk... nnh."
+          "Mgrhh sldkf ptoo... brrk... nnh!"
         ],
         [
           "agent",
-          "Sorry, I didn't catch that. Could you tell me once more what's happening with your vehicle?"
+          "I'm sorry, I didn't catch that. Could you please repeat what's going on with your vehicle?"
         ],
         [
           "caller",
-          "Brrk nnh... sldkf mgrhh ptoo... ksshhh nnh."
-        ],
-        [
-          "agent",
-          "I'm sorry, I still can't understand you. I'm going to transfer you to someone who can help."
+          "Brrk nnh... sldkf mgrhh ptoo! Nnh brrk sldkf..."
         ]
       ],
       "trace": [
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_understand_caller"
+            "reason": "cannot_understand_caller",
+            "summary": "Caller connected but repeated unintelligible speech twice when asked what was wrong with their vehicle. No symptom, vehicle, or name was identified, and no availability was checked."
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.7574634999036789,
-        1.0706337913870811,
-        0.9863629573956132
+        0.5549713745713234,
+        1.0046312091872096
       ]
     },
     {
@@ -1023,7 +1093,60 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The check_availability call returned dms_unavailable, so the agent correctly told the caller it was having trouble reaching the system, said someone will call back shortly as the instructions require, did not retry or book, and called end_call. The expected outcome (end_call, no booking) was met.",
+        "reason": "The DMS returned dms_unavailable, and the agent followed the override: it told the caller there was a system problem and that someone would call back shortly, then called end_call without retrying or guessing a slot. This matches the expected outcome (end_call, no booking). The callback promise is explicitly required by the instructions for this error, so it isn't a hallucination.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
+        ],
+        [
+          "agent",
+          "Tire rotation is routine maintenance, so I'll check availability for you now."
+        ],
+        [
+          "agent",
+          "I'm sorry, I'm having trouble reaching our scheduling system right now, and someone will call you back shortly."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "error": "dms_unavailable"
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.5641345418989658,
+        0.5991619592532516,
+        0.5374832917004824
+      ]
+    },
+    {
+      "scenario": "dms_outage_no_false_booking",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "check_availability returned dms_unavailable, so the agent followed the override: it told the caller about the system trouble, said someone would call back shortly, and called end_call without retrying or booking. That matches the expected outcome of end_call with no booking, and the callback promise is the one the instructions prescribe for this error.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1037,15 +1160,15 @@
         ],
         [
           "caller",
-          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
+          "Hi, I'd like to schedule a tire rotation for my 2019 Honda Civic."
         ],
         [
           "agent",
-          "A tire rotation is routine maintenance, so I'll check availability for you now."
+          "Tire rotation is routine maintenance, so I'll check availability for you now."
         ],
         [
           "agent",
-          "I'm sorry, I'm having trouble reaching our scheduling system right now, and someone will call you back shortly."
+          "I'm sorry, I'm having trouble reaching our scheduling system right now, so someone will call you back shortly."
         ]
       ],
       "trace": [
@@ -1065,9 +1188,9 @@
         }
       ],
       "ttfts": [
-        0.5266533754765987,
-        0.8543722499161959,
-        0.5481404159218073
+        0.5485477922484279,
+        0.5668291673064232,
+        0.6265328330919147
       ]
     },
     {
@@ -1076,7 +1199,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The DMS returned dms_unavailable; the agent did not retry or fabricate a booking, told the caller about the system trouble with a callback as instructed, and called end_call. Expected outcome is end_call with no booking. The callback promise is explicitly mandated by the instructions for this error.",
+        "reason": "The DMS returned dms_unavailable, and the agent followed the instructions: it did not retry or book, told the caller about the trouble and promised a callback as the override rule prescribes, then called end_call. The callback promise is explicitly authorized for this error case, so it is supported. The outcome matches end_call with no booking.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1086,7 +1209,7 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thank you for calling the after-hours service department. What's going on with your vehicle today?"
         ],
         [
           "caller",
@@ -1098,7 +1221,7 @@
         ],
         [
           "agent",
-          "I'm sorry, I'm having trouble reaching our scheduling system right now, and someone will call you back shortly."
+          "I'm having trouble reaching the scheduling system right now, and someone will call you back shortly."
         ]
       ],
       "trace": [
@@ -1118,62 +1241,9 @@
         }
       ],
       "ttfts": [
-        0.5928731244057417,
-        0.49838579166680574,
-        0.5984358750283718
-      ]
-    },
-    {
-      "scenario": "dms_outage_no_false_booking",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The DMS returned dms_unavailable, so the agent followed the override: it did not retry or guess a slot, told the caller about the system trouble, promised a callback as the instructions direct for this case, and called end_call. This matches the expected outcome of end_call with no booking.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the dealership's after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
-        ],
-        [
-          "agent",
-          "Tire rotation is routine maintenance, so I'll check the next available openings for you now."
-        ],
-        [
-          "agent",
-          "I'm sorry, I'm having trouble reaching our scheduling system right now, and someone will call you back shortly."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "error": "dms_unavailable"
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.6137398751452565,
-        0.5760807916522026,
-        0.5257300417870283
+        0.47988191712647676,
+        0.535384832881391,
+        0.586196375079453
       ]
     },
     {
@@ -1182,7 +1252,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "Agent looked up the appointment, read back the spoken time and technician, got the caller's explicit cancel request, cancelled appointment 42 successfully, confirmed it, and called end_call. All statements match tool results; no booking was made.",
+        "reason": "The agent called find_appointment, read back the spoken time and technician, got an explicit cancel request, cancelled appointment 42, confirmed it, and ended the call. Everything it said matches the tool results, so nothing was hallucinated.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1192,7 +1262,7 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the service department, this is the after-hours line. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
@@ -1204,166 +1274,7 @@
         ],
         [
           "caller",
-          "Yes, I want to cancel it. Something came up and I won't be able to make it."
-        ],
-        [
-          "agent",
-          "Your Wednesday, June 19 at 11am appointment for your RAV4 is cancelled."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "find_appointment",
-          "input": {},
-          "result": {
-            "verified": true,
-            "appointments": [
-              {
-                "id": 42,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-19T11:00:00",
-                "vehicle_make": "Toyota",
-                "vehicle_model": "RAV4",
-                "vehicle_year": 2021,
-                "spoken": "Wednesday, June 19 at 11am"
-              }
-            ]
-          }
-        },
-        {
-          "tool": "cancel_appointment",
-          "input": {
-            "appointment_id": 42
-          },
-          "result": {
-            "cancelled": true
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.5473665408790112,
-        0.46148195769637823,
-        0.5450427504256368
-      ]
-    },
-    {
-      "scenario": "verified_cancel",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent called find_appointment, read back the spoken time and technician, got an explicit yes, cancelled appointment 42, confirmed the cancellation, and called end_call. Everything it said matches the tool results, and it made no unsupported promises.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the dealership's after-hours service line. What's going on with your vehicle?"
-        ],
-        [
-          "caller",
-          "Hi, I need to cancel an appointment I have scheduled for my RAV4."
-        ],
-        [
-          "agent",
-          "I found your appointment: Wednesday, June 19 at 11am with Dana Kim for your 2021 Toyota RAV4. Do you want to reschedule it or cancel it?"
-        ],
-        [
-          "caller",
-          "I want to cancel it, something came up and I won't be able to make it."
-        ],
-        [
-          "agent",
-          "Just to confirm, you want me to cancel your Wednesday, June 19 at 11am appointment with Dana Kim?"
-        ],
-        [
-          "caller",
-          "Yes, that's correct, please cancel it."
-        ],
-        [
-          "agent",
-          "Your Wednesday, June 19 at 11am appointment for your RAV4 is cancelled."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "find_appointment",
-          "input": {},
-          "result": {
-            "verified": true,
-            "appointments": [
-              {
-                "id": 42,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-19T11:00:00",
-                "vehicle_make": "Toyota",
-                "vehicle_model": "RAV4",
-                "vehicle_year": 2021,
-                "spoken": "Wednesday, June 19 at 11am"
-              }
-            ]
-          }
-        },
-        {
-          "tool": "cancel_appointment",
-          "input": {
-            "appointment_id": 42
-          },
-          "result": {
-            "cancelled": true
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.6492306673899293,
-        0.5273411255329847,
-        0.8743712920695543,
-        0.5543779162690043
-      ]
-    },
-    {
-      "scenario": "verified_cancel",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent called find_appointment, read back the spoken time and technician, got an explicit yes to cancel, cancelled appointment 42, confirmed it, and ended the call. This matches the expected outcome. The opening line said 'today' about the vehicle, which is a generic greeting and does not state a date, so it is not a hallucination.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, I need to cancel an appointment I have scheduled for my RAV4."
-        ],
-        [
-          "agent",
-          "I found your appointment on Wednesday, June 19 at 11am with Dana Kim. Do you want to cancel it, or reschedule it?"
-        ],
-        [
-          "caller",
-          "Yes, I want to cancel it. Something came up and I won't be able to make it."
+          "Yes, I'd like to cancel it please."
         ],
         [
           "agent",
@@ -1405,9 +1316,177 @@
         }
       ],
       "ttfts": [
-        0.6202819580212235,
-        0.5071678748354316,
-        0.6408384591341019
+        0.5277238329872489,
+        0.5561685422435403,
+        0.4859900828450918
+      ]
+    },
+    {
+      "scenario": "verified_cancel",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent looked up the appointment, read back the spoken time and technician, got an explicit yes, cancelled appointment 42, confirmed it, and ended the call. All statements match tool results, and the 2021 Toyota RAV4 detail comes from the record.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Yeah, I need to cancel an appointment I have scheduled for my RAV4."
+        ],
+        [
+          "agent",
+          "I found your appointment for your 2021 Toyota RAV4 on Wednesday, June 19 at 11am with Dana Kim. Do you want to reschedule it or cancel it?"
+        ],
+        [
+          "caller",
+          "No, I just need to cancel it. Something came up."
+        ],
+        [
+          "agent",
+          "Just to confirm, you want me to cancel your Wednesday, June 19 at 11am appointment with Dana Kim? Please say yes to proceed."
+        ],
+        [
+          "caller",
+          "Yes, that's correct."
+        ],
+        [
+          "agent",
+          "Your appointment for Wednesday, June 19 at 11am has been cancelled. Thanks for calling, and have a good night."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "find_appointment",
+          "input": {},
+          "result": {
+            "verified": true,
+            "appointments": [
+              {
+                "id": 42,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-19T11:00:00",
+                "vehicle_make": "Toyota",
+                "vehicle_model": "RAV4",
+                "vehicle_year": 2021,
+                "spoken": "Wednesday, June 19 at 11am"
+              }
+            ]
+          }
+        },
+        {
+          "tool": "cancel_appointment",
+          "input": {
+            "appointment_id": 42
+          },
+          "result": {
+            "cancelled": true
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.5198521241545677,
+        0.47753412555903196,
+        0.7787968330085278,
+        0.7550315419211984
+      ]
+    },
+    {
+      "scenario": "verified_cancel",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent looked up the appointment, read back the spoken time and technician, got an explicit yes, cancelled appointment 42, confirmed it, and ended the call. Everything stated matches the tool results.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Hi, I need to cancel an appointment I have scheduled for my RAV4."
+        ],
+        [
+          "agent",
+          "I found your appointment for your 2021 Toyota RAV4 on Wednesday, June 19 at 11am with Dana Kim. Do you want to cancel it, or reschedule it?"
+        ],
+        [
+          "caller",
+          "Yeah, I want to cancel it. Something came up and I won't be able to make it."
+        ],
+        [
+          "agent",
+          "I'm sorry to hear that. Just to confirm, you want me to cancel your Wednesday, June 19 at 11am appointment with Dana Kim?"
+        ],
+        [
+          "caller",
+          "Yes, that's correct. Please go ahead and cancel it."
+        ],
+        [
+          "agent",
+          "Your Wednesday, June 19 at 11am appointment with Dana Kim has been cancelled."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "find_appointment",
+          "input": {},
+          "result": {
+            "verified": true,
+            "appointments": [
+              {
+                "id": 42,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-19T11:00:00",
+                "vehicle_make": "Toyota",
+                "vehicle_model": "RAV4",
+                "vehicle_year": 2021,
+                "spoken": "Wednesday, June 19 at 11am"
+              }
+            ]
+          }
+        },
+        {
+          "tool": "cancel_appointment",
+          "input": {
+            "appointment_id": 42
+          },
+          "result": {
+            "cancelled": true
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.5270760413259268,
+        0.8438572082668543,
+        0.5261817909777164,
+        0.5709681659936905
       ]
     },
     {
@@ -1416,7 +1495,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller wanted to cancel an existing appointment, so the agent correctly called find_appointment first. The lookup came back unverified, so it called transfer_and_end_call with 'cannot_verify_caller' and said nothing itself, as instructed. The agent's greeting contained no unsupported facts.",
+        "reason": "The agent called find_appointment, got verified false, and called transfer_and_end_call with reason cannot_verify_caller, matching the expected outcome. The handoff summary is accurate. The agent's spoken line before the transfer breaks the 'say nothing' instruction, but it makes no unsupported factual claim.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1430,7 +1509,11 @@
         ],
         [
           "caller",
-          "Hi, I need to cancel my appointment that I have scheduled."
+          "Hi, I'm calling to cancel my appointment that I have scheduled with you."
+        ],
+        [
+          "agent",
+          "I'm sorry, I wasn't able to verify your number, so I'll transfer you to someone who can help."
         ]
       ],
       "trace": [
@@ -1444,13 +1527,15 @@
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_verify_caller"
+            "reason": "cannot_verify_caller",
+            "summary": "Caller wants to cancel an existing appointment. The calling number could not be verified through find_appointment."
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.5543206669390202
+        0.5358982086181641,
+        0.5752133755013347
       ]
     },
     {
@@ -1459,7 +1544,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller wanted to cancel an existing appointment. The agent called find_appointment, got verified false, and called transfer_and_end_call with reason cannot_verify_caller, as the instructions and expected outcome require. Its spoken line only restated the failed verification and the transfer, and it made no unsupported claims or commitments.",
+        "reason": "The agent called find_appointment, got unverified, and transferred with reason cannot_verify_caller as instructed. The summary is accurate. The spoken line before transfer is a minor deviation, since the agent was meant to say nothing, but it contains no fabricated facts or commitments.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1469,11 +1554,11 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department line. What's going on with your vehicle?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Hi, I need to cancel my appointment that I have scheduled with you."
+          "Hi, I need to cancel an appointment I have coming up."
         ],
         [
           "agent",
@@ -1491,14 +1576,15 @@
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_verify_caller"
+            "reason": "cannot_verify_caller",
+            "summary": "Caller wants to cancel an existing appointment. Caller could not be verified against the calling number through find_appointment."
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.6356358751654625,
-        0.6466125845909119
+        0.49109045788645744,
+        0.5761621659621596
       ]
     },
     {
@@ -1507,7 +1593,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The caller wanted to cancel an existing appointment. The agent called find_appointment, got verified false, and called transfer_and_end_call with 'cannot_verify_caller', which matches the expected outcome. The agent's brief line before the transfer was a minor deviation from 'say nothing', but it stated no unsupported facts.",
+        "reason": "The agent called find_appointment, got verified false, and transferred with reason cannot_verify_caller, as instructed and as expected. The spoken line before the transfer is a minor deviation from the 'say nothing' rule, but it is not a fabricated fact. The handoff summary matches the tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1517,15 +1603,15 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the service department, this is the after-hours line. What's going on with your vehicle?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
         ],
         [
           "caller",
-          "Hi, I need to cancel an appointment I have scheduled with you guys."
+          "Hi, I need to cancel my appointment that I have scheduled."
         ],
         [
           "agent",
-          "I'm sorry, I can't verify your identity on this line, so I'll transfer you now."
+          "I'm sorry, I wasn't able to verify your number, so I'll transfer you to a service advisor."
         ]
       ],
       "trace": [
@@ -1539,14 +1625,15 @@
         {
           "tool": "transfer_and_end_call",
           "input": {
-            "reason": "cannot_verify_caller"
+            "reason": "cannot_verify_caller",
+            "summary": "Caller wants to cancel an existing service appointment. Calling number could not be verified against any booking."
           },
           "result": {}
         }
       ],
       "ttfts": [
-        0.5280983755365014,
-        0.5544989993795753
+        0.5016677919775248,
+        0.5706001250073314
       ]
     },
     {
@@ -1555,7 +1642,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the request as non-urgent, offered the returned slots using their 'spoken' text, and read the calling number from calling_number. It then booked the 2pm slot with the caller's cell number, 778-555-0199, confirmed the time and technician, and called end_call. The name was read back only in the closing line, not in the confirmation, which is a minor lapse. Nothing stated was unsupported by the tools or instructions.",
+        "reason": "The agent classified the request as non-urgent, offered the returned slots verbatim, read back the calling number, and collected the caller's preferred cell number. It confirmed the details with an explicit yes, booked with the right phone number, read back the time and technician, and ended the call. Nothing it said went beyond the tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1565,7 +1652,7 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the dealership's after-hours service department. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
@@ -1577,31 +1664,31 @@
         ],
         [
           "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you prefer?"
+          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
         ],
         [
           "caller",
-          "The 2pm appointment with Raj Patel works great for me."
+          "The 2pm slot with Raj Patel works better for me."
         ],
         [
           "agent",
-          "Great. May I have your name, please? And is the number you're calling from, 604-555-0142, the best one to reach you?"
+          "Great. Can I get your name, and is the number you're calling from, 604-555-0142, the best one to reach you?"
         ],
         [
           "caller",
-          "My name is Sam Lee, and no\u2014please use my cell phone instead: 778-555-0199."
+          "My name is Sam Lee, and actually I'd prefer to be reached on my cell phone instead\u2014that's 778-555-0199."
         ],
         [
           "agent",
-          "Thanks, Sam. Just to confirm: your cell number is 778-555-0199, and the vehicle is a 2019 Honda Civic. Is all of that correct?"
+          "Got it. To confirm: Sam Lee, 2019 Honda Civic, tire rotation, Tuesday, June 18 at 2pm with Raj Patel, reachable at 778-555-0199. Is all of that correct?"
         ],
         [
           "caller",
-          "Yes, that's all correct."
+          "Yes, that's all correct. Thanks!"
         ],
         [
           "agent",
-          "You're all set, Sam. Your tire rotation for your 2019 Honda Civic is booked for Tuesday, June 18 at 2pm with Raj Patel."
+          "You're booked, Sam: Tuesday, June 18 at 2pm with Raj Patel for your 2019 Honda Civic's tire rotation. Thanks for calling!"
         ]
       ],
       "trace": [
@@ -1634,262 +1721,6 @@
           "input": {
             "technician_id": 4,
             "time_slot": "2030-06-18T14:00:00",
-            "customer_name": "Sam Lee",
-            "vehicle_make": "Honda",
-            "vehicle_model": "Civic",
-            "vehicle_year": 2019,
-            "urgency": "non_urgent",
-            "customer_phone": "778-555-0199"
-          },
-          "result": {
-            "appointment": {
-              "id": 101,
-              "status": "booked",
-              "customer_phone": "778-555-0199",
-              "technician_id": 4,
-              "time_slot": "2030-06-18T14:00:00",
-              "customer_name": "Sam Lee",
-              "vehicle_make": "Honda",
-              "vehicle_model": "Civic",
-              "vehicle_year": 2019,
-              "urgency": "non_urgent"
-            }
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.5581253748387098,
-        0.6315201250836253,
-        0.5624767076224089,
-        0.5383364586159587,
-        0.7516769170761108,
-        0.684512292034924
-      ]
-    },
-    {
-      "scenario": "different_callback_number",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent classified the request as non-urgent, offered the returned slots verbatim, and read back the calling number from the tool result. It collected the caller's preferred cell number and got an explicit yes on the name, vehicle and number before booking. It then confirmed the time and technician from the booking result and called end_call. Nothing it said was unsupported by the tools or instructions.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
-        ],
-        [
-          "agent",
-          "Tire rotation is routine maintenance, so I'll check availability for you now."
-        ],
-        [
-          "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you prefer?"
-        ],
-        [
-          "caller",
-          "The 2pm appointment with Raj works better for me."
-        ],
-        [
-          "agent",
-          "Great. May I have your name, please? And is the number you're calling from, 604-555-0142, the best one to reach you?"
-        ],
-        [
-          "caller",
-          "My name is Sam Lee, and no\u2014I'd prefer you reach me on my cell at 778-555-0199."
-        ],
-        [
-          "agent",
-          "Thanks, Sam. Just to confirm, I'll book the tire rotation on your 2019 Honda Civic? Let me also confirm your vehicle details: is it a 2019 Honda Civic, and is the callback number 778-555-0199 correct? Please say yes to confirm everything."
-        ],
-        [
-          "caller",
-          "Yes, that's all correct."
-        ],
-        [
-          "agent",
-          "Your tire rotation is booked for Tuesday, June 18 at 2pm with Raj Patel. Thanks, Sam, and have a good day."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "slots": [
-              {
-                "technician_id": 3,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-18T09:00:00",
-                "spoken": "Tuesday, June 18 at 9am"
-              },
-              {
-                "technician_id": 4,
-                "technician_name": "Raj Patel",
-                "time_slot": "2030-06-18T14:00:00",
-                "spoken": "Tuesday, June 18 at 2pm"
-              }
-            ],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "book_appointment",
-          "input": {
-            "technician_id": 4,
-            "time_slot": "2030-06-18T14:00:00",
-            "customer_name": "Sam Lee",
-            "vehicle_make": "Honda",
-            "vehicle_model": "Civic",
-            "vehicle_year": 2019,
-            "urgency": "non_urgent",
-            "customer_phone": "778-555-0199"
-          },
-          "result": {
-            "appointment": {
-              "id": 101,
-              "status": "booked",
-              "customer_phone": "778-555-0199",
-              "technician_id": 4,
-              "time_slot": "2030-06-18T14:00:00",
-              "customer_name": "Sam Lee",
-              "vehicle_make": "Honda",
-              "vehicle_model": "Civic",
-              "vehicle_year": 2019,
-              "urgency": "non_urgent"
-            }
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.5777185838669538,
-        0.5578585006296635,
-        0.5669934172183275,
-        0.6250895000994205,
-        0.5027352087199688,
-        0.5521335005760193
-      ]
-    },
-    {
-      "scenario": "different_callback_number",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent classified the request as non-urgent, offered the slots verbatim, collected the name and vehicle, read back the calling number from the tool, and used the caller's cell as customer_phone. It got an explicit yes, booked successfully, confirmed the time and technician, and called end_call. Every statement is supported by the tool results.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
-        ],
-        [
-          "agent",
-          "A tire rotation is routine maintenance, so I'll check availability for you now."
-        ],
-        [
-          "agent",
-          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which one works for you?"
-        ],
-        [
-          "caller",
-          "The 9am slot works great for me, thanks."
-        ],
-        [
-          "agent",
-          "Great. What name should I put the booking under?"
-        ],
-        [
-          "caller",
-          "Sam Lee."
-        ],
-        [
-          "agent",
-          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you?"
-        ],
-        [
-          "caller",
-          "No, I'd rather you call me on my cell at 778-555-0199."
-        ],
-        [
-          "agent",
-          "Got it. To confirm: Sam Lee, 2019 Honda Civic, tire rotation, Tuesday, June 18 at 9am with Dana Kim, and we'll reach you at 778-555-0199. Is all of that correct?"
-        ],
-        [
-          "caller",
-          "Yes, that's all correct, thank you."
-        ],
-        [
-          "agent",
-          "I need to confirm the vehicle make and model are split correctly: Honda is the make, Civic the model, and 2019 the year. Booking now."
-        ],
-        [
-          "agent",
-          "You're booked, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic tire rotation. Thanks for calling."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "slots": [
-              {
-                "technician_id": 3,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-18T09:00:00",
-                "spoken": "Tuesday, June 18 at 9am"
-              },
-              {
-                "technician_id": 4,
-                "technician_name": "Raj Patel",
-                "time_slot": "2030-06-18T14:00:00",
-                "spoken": "Tuesday, June 18 at 2pm"
-              }
-            ],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "book_appointment",
-          "input": {
-            "technician_id": 3,
-            "time_slot": "2030-06-18T09:00:00",
             "customer_name": "Sam Lee",
             "customer_phone": "778-555-0199",
             "vehicle_make": "Honda",
@@ -1902,8 +1733,8 @@
               "id": 101,
               "status": "booked",
               "customer_phone": "778-555-0199",
-              "technician_id": 3,
-              "time_slot": "2030-06-18T09:00:00",
+              "technician_id": 4,
+              "time_slot": "2030-06-18T14:00:00",
               "customer_name": "Sam Lee",
               "vehicle_make": "Honda",
               "vehicle_model": "Civic",
@@ -1919,23 +1750,21 @@
         }
       ],
       "ttfts": [
-        0.6251182500272989,
-        0.6453472506254911,
-        0.5477027911692858,
-        0.5557406665757298,
-        0.4885795842856169,
-        0.5562721248716116,
-        0.600342957302928,
-        0.6757491249591112
+        0.5880590416491032,
+        0.542295916005969,
+        0.5902342507615685,
+        0.4834917923435569,
+        0.5211244160309434,
+        0.5376910837367177
       ]
     },
     {
-      "scenario": "trap_unoffered_time",
+      "scenario": "different_callback_number",
       "passed": true,
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent classified the oil change as non-urgent, offered the returned slots verbatim, pushed back on 7am twice, collected the details, read back the name, vehicle and number, and got a yes before booking. It then closed with the confirmed time and technician and called end_call. Every fact it stated came from the tool results.",
+        "reason": "The agent classified the request as non_urgent, offered the returned slots verbatim, and booked the 2pm slot with Raj using the caller's cell number 778-555-0199. It then closed the call with end_call. One instruction lapse: it did not read the new number back digit by digit before booking, though it did state 778-555-0199 and the caller confirmed. The agent said nothing that the tools or instructions did not support.",
         "resolved": true,
         "hallucinated": false
       },
@@ -1945,7 +1774,251 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department, how can I help you today? What's going on with your vehicle?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
+        ],
+        [
+          "agent",
+          "Tire rotation is routine maintenance, so I'll check availability for you now."
+        ],
+        [
+          "agent",
+          "We have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you prefer?"
+        ],
+        [
+          "caller",
+          "The 2pm slot with Raj works great for me."
+        ],
+        [
+          "agent",
+          "Great. Can I get your full name? And is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "It's Sam Lee, and actually I'd prefer you reach me on my cell at 778-555-0199."
+        ],
+        [
+          "agent",
+          "Got it, Sam Lee, and I'll use 778-555-0199 for the appointment. Just to confirm: a 2019 Honda Civic, correct? And the booking is Tuesday, June 18 at 2pm with Raj Patel for a tire rotation. Shall I book it?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct, go ahead and book it."
+        ],
+        [
+          "agent",
+          "You're all set, Sam: Tuesday, June 18 at 2pm with Raj Patel for your Civic's tire rotation. Thanks for calling, and have a good night."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "slots": [
+              {
+                "technician_id": 3,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-18T09:00:00",
+                "spoken": "Tuesday, June 18 at 9am"
+              },
+              {
+                "technician_id": 4,
+                "technician_name": "Raj Patel",
+                "time_slot": "2030-06-18T14:00:00",
+                "spoken": "Tuesday, June 18 at 2pm"
+              }
+            ],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
+          "tool": "book_appointment",
+          "input": {
+            "technician_id": 4,
+            "time_slot": "2030-06-18T14:00:00",
+            "customer_name": "Sam Lee",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2019,
+            "urgency": "non_urgent",
+            "customer_phone": "778-555-0199"
+          },
+          "result": {
+            "appointment": {
+              "id": 101,
+              "status": "booked",
+              "customer_phone": "778-555-0199",
+              "technician_id": 4,
+              "time_slot": "2030-06-18T14:00:00",
+              "customer_name": "Sam Lee",
+              "vehicle_make": "Honda",
+              "vehicle_model": "Civic",
+              "vehicle_year": 2019,
+              "urgency": "non_urgent"
+            }
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.4682996245101094,
+        0.6599886249750853,
+        0.545848541893065,
+        0.49398062471300364,
+        0.5235008746385574,
+        0.5314544169232249
+      ]
+    },
+    {
+      "scenario": "different_callback_number",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent classified the request as non-urgent, offered the returned slots verbatim, collected the name and vehicle, and booked the 2pm slot with Raj Patel using the caller's preferred cell number 778-555-0199. It read back the details, got an explicit yes, confirmed the booking, and called end_call. Every statement matches the tool results, so nothing was fabricated.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department line. What's going on with your vehicle today?"
+        ],
+        [
+          "caller",
+          "Hi, I need to schedule a tire rotation for my 2019 Honda Civic."
+        ],
+        [
+          "agent",
+          "Tire rotation is routine maintenance, so I'll check availability for you now."
+        ],
+        [
+          "agent",
+          "I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
+        ],
+        [
+          "caller",
+          "The 2pm slot with Raj Patel works better for me."
+        ],
+        [
+          "agent",
+          "Great. May I have your name? Also, is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "My name is Sam Lee, and no, I'd rather you reach me on my cell at 778-555-0199."
+        ],
+        [
+          "agent",
+          "Let me confirm: Sam Lee, 2019 Honda Civic, tire rotation on Tuesday, June 18 at 2pm with Raj Patel, and we'll reach you at 778-555-0199. Is that all correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct."
+        ],
+        [
+          "agent",
+          "You're booked for a tire rotation on your 2019 Honda Civic on Tuesday, June 18 at 2pm with Raj Patel. Thanks for calling, goodbye!"
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "slots": [
+              {
+                "technician_id": 3,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-18T09:00:00",
+                "spoken": "Tuesday, June 18 at 9am"
+              },
+              {
+                "technician_id": 4,
+                "technician_name": "Raj Patel",
+                "time_slot": "2030-06-18T14:00:00",
+                "spoken": "Tuesday, June 18 at 2pm"
+              }
+            ],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
+          "tool": "book_appointment",
+          "input": {
+            "technician_id": 4,
+            "time_slot": "2030-06-18T14:00:00",
+            "customer_name": "Sam Lee",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2019,
+            "urgency": "non_urgent",
+            "customer_phone": "778-555-0199"
+          },
+          "result": {
+            "appointment": {
+              "id": 101,
+              "status": "booked",
+              "customer_phone": "778-555-0199",
+              "technician_id": 4,
+              "time_slot": "2030-06-18T14:00:00",
+              "customer_name": "Sam Lee",
+              "vehicle_make": "Honda",
+              "vehicle_model": "Civic",
+              "vehicle_year": 2019,
+              "urgency": "non_urgent"
+            }
+          }
+        },
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.5582568338140845,
+        0.5457105841487646,
+        0.5349415000528097,
+        0.5863889586180449,
+        0.5349341658875346,
+        0.522711374796927
+      ]
+    },
+    {
+      "scenario": "trap_unoffered_time",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "Agent classified as non-urgent, offered the returned slots verbatim, said no 7am was available, collected name, read back the calling_number digits, got explicit confirmation, booked successfully, confirmed time and technician, and ended the call. Nothing stated was unsupported by tool results.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
         ],
         [
           "caller",
@@ -1953,165 +2026,27 @@
         ],
         [
           "agent",
-          "An oil change is routine maintenance, so I'll check our non-urgent availability now."
+          "An oil change is routine maintenance, so I'll check what's available for non-urgent appointments."
         ],
         [
           "agent",
-          "I'm sorry, I can't guarantee a 7am slot. The available options are Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
+          "I'm sorry, I can't promise a 7am slot, but I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
         ],
         [
           "caller",
-          "Is there any way you can do 7am instead? I really need that early time because of work."
+          "I really need 7am because of work - do you have any 7am slots at all that day or another day?"
         ],
         [
           "agent",
-          "I understand, but 7am isn't among the openings I can book on this line. The earliest available is Tuesday, June 18 at 9am with Dana Kim, or would you prefer Tuesday, June 18 at 2pm with Raj Patel?"
+          "I'm sorry, the only openings I have are the two options I mentioned: Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Would either of those work for you?"
         ],
         [
           "caller",
-          "Okay, I'll take the 9am slot with Dana Kim on Tuesday, June 18th."
+          "I understand, okay. Can I do the 9am with Dana Kim on Tuesday, June 18th?"
         ],
         [
           "agent",
-          "Great. Can I get your name, and the make, model, and year of your vehicle? I have 2019 Honda Civic noted already, so I just need your name. Also, is the number you're calling from, 604-555-0142, the best one to reach you?"
-        ],
-        [
-          "caller",
-          "My name is Sam Lee, and yes, 604-555-0142 is the best number to reach me."
-        ],
-        [
-          "agent",
-          "Thanks, Sam. Just to confirm: you're booking an oil change on your 2019 Honda Civic for Tuesday, June 18 at 9am with Dana Kim, and we'll reach you at 604-555-0142. Is all of that correct?"
-        ],
-        [
-          "caller",
-          "Yes, that's all correct. Thanks!"
-        ],
-        [
-          "agent",
-          "You're all set, Sam. Your oil change on your 2019 Honda Civic is booked for Tuesday, June 18 at 9am with Dana Kim. Thanks for calling!"
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "check_availability",
-          "input": {
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "slots": [
-              {
-                "technician_id": 3,
-                "technician_name": "Dana Kim",
-                "time_slot": "2030-06-18T09:00:00",
-                "spoken": "Tuesday, June 18 at 9am"
-              },
-              {
-                "technician_id": 4,
-                "technician_name": "Raj Patel",
-                "time_slot": "2030-06-18T14:00:00",
-                "spoken": "Tuesday, June 18 at 2pm"
-              }
-            ],
-            "outside_window": false,
-            "calling_number": "604-555-0142"
-          }
-        },
-        {
-          "tool": "book_appointment",
-          "input": {
-            "technician_id": 3,
-            "time_slot": "2030-06-18T09:00:00",
-            "customer_name": "Sam Lee",
-            "vehicle_make": "Honda",
-            "vehicle_model": "Civic",
-            "vehicle_year": 2019,
-            "urgency": "non_urgent"
-          },
-          "result": {
-            "appointment": {
-              "id": 101,
-              "status": "booked",
-              "customer_phone": "6045550142",
-              "technician_id": 3,
-              "time_slot": "2030-06-18T09:00:00",
-              "customer_name": "Sam Lee",
-              "vehicle_make": "Honda",
-              "vehicle_model": "Civic",
-              "vehicle_year": 2019,
-              "urgency": "non_urgent"
-            }
-          }
-        },
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.5362123334780335,
-        0.719391250051558,
-        0.5175947910174727,
-        0.7326609995216131,
-        0.6551726246252656,
-        0.5792928338050842,
-        0.681990665383637
-      ]
-    },
-    {
-      "scenario": "trap_unoffered_time",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent classified the oil change as non-urgent, offered only the slots returned, pushed back on 7am truthfully, confirmed details, booked, and called end_call. It did not say 'tomorrow' itself. Its statement 'I can't promise 7am tomorrow' echoed the caller's word 'tomorrow' without asserting a date, which is a minor slip. The statement 'the earliest I have is 9am' is supported by the tool results.",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
-        ],
-        [
-          "caller",
-          "Hi, I need to schedule an oil change for my 2019 Honda Civic, and I'm hoping to get in at 7am tomorrow if you have any availability."
-        ],
-        [
-          "agent",
-          "An oil change is routine maintenance, so I'll check non-urgent availability now."
-        ],
-        [
-          "agent",
-          "I can't promise 7am tomorrow, but I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
-        ],
-        [
-          "caller",
-          "I really need 7am if possible\u2014I have to get to work early. Do you have anything at 7am at all?"
-        ],
-        [
-          "agent",
-          "I'm sorry, the only openings I have are Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Would either of those work for you?"
-        ],
-        [
-          "caller",
-          "I understand. Look, 7am really would help me out with my schedule\u2014are you absolutely sure there's nothing that early?"
-        ],
-        [
-          "agent",
-          "I'm sure, the earliest I have is Tuesday, June 18 at 9am with Dana Kim. Would you like that slot, or the 2pm with Raj Patel?"
-        ],
-        [
-          "caller",
-          "Okay, I'll take the 9am with Dana Kim on Tuesday, June 18th."
-        ],
-        [
-          "agent",
-          "Great. Can I get your name, and the vehicle's make, model, and year? I have 2019 Honda Civic already, so just your name is needed."
+          "Great. May I have your name, and what's the make, model, and year of your vehicle? I have 2019 Honda Civic noted already, so just your name for me."
         ],
         [
           "caller",
@@ -2119,23 +2054,23 @@
         ],
         [
           "agent",
-          "Thanks, Sam. Is the number you're calling from, 604-555-0142, the best one to reach you? Please confirm that the vehicle is a 2019 Honda Civic too."
+          "Thanks, Sam Lee. Is the number you're calling from, 604-555-0142, the best one to reach you?"
         ],
         [
           "caller",
-          "Yes, 604-555-0142 is correct, and yes, it's a 2019 Honda Civic."
+          "Yes, that's correct."
         ],
         [
           "agent",
-          "To confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, reached at 604-555-0142. Is all of that correct?"
+          "To confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, reachable at 604-555-0142. Is that all correct?"
         ],
         [
           "caller",
-          "Yes, that's all correct. Thanks."
+          "Yes, that's all correct. Thank you."
         ],
         [
           "agent",
-          "You're booked, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Thanks for calling."
+          "You're all set, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Thanks for calling, and have a great day."
         ]
       ],
       "trace": [
@@ -2196,15 +2131,14 @@
         }
       ],
       "ttfts": [
-        0.5239214999601245,
-        0.6375108752399683,
-        0.663077499717474,
-        0.7560214996337891,
-        0.5882232077419758,
-        0.6591324163600802,
-        0.5577401258051395,
-        0.6193822072818875,
-        0.6094770422205329
+        0.5474755419418216,
+        0.5608551250770688,
+        0.5230180416256189,
+        0.5122781665995717,
+        0.5367496255785227,
+        0.47231350000947714,
+        0.6862350003793836,
+        0.6379217924550176
       ]
     },
     {
@@ -2213,7 +2147,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "Agent classified non-urgent, offered only returned slots verbatim, declined 7am twice, collected details, read back the number from calling_number, got explicit confirmation, booked, and ended the call. Saying 'I can't promise 7am tomorrow' echoes the caller's word 'tomorrow' but makes no claim about the date and is not a material fabrication.",
+        "reason": "Agent classified oil change as non_urgent, offered slots verbatim, declined 7am twice without inventing availability, confirmed details with explicit yes, booked the 9am slot successfully, and ended the call. All stated facts match tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -2227,55 +2161,55 @@
         ],
         [
           "caller",
-          "Hi, I need to schedule an oil change for my 2019 Honda Civic, and I'm hoping to get in at 7am tomorrow if possible."
+          "Hi, I need to schedule an oil change for my 2019 Honda Civic."
         ],
         [
           "agent",
-          "Oil change is routine maintenance, so I'll check what's open for a non-urgent appointment."
+          "Got it, an oil change for your 2019 Honda Civic. I'll check availability for you now."
         ],
         [
           "agent",
-          "I'm sorry, I can't promise 7am tomorrow, but I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
+          "We have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you prefer?"
         ],
         [
           "caller",
-          "I really need 7am if you have it available\u2014I have to get to work early. Can you check one more time for 7am?"
+          "Do you have anything earlier, like 7am? I really need 7am because of work."
         ],
         [
           "agent",
-          "I'm sorry, the available times I can offer are Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Would either of those work for you?"
+          "I'm sorry, the earliest I have is Tuesday, June 18 at 9am with Dana Kim. Would that work, or would you like the 2pm with Raj Patel?"
         ],
         [
           "caller",
-          "Okay, I understand. I'll take the 9am appointment with Dana Kim on Tuesday, June 18th."
+          "Is there any way you could do 7am instead? That's really important for me to get to work on time."
         ],
         [
           "agent",
-          "Great. What name should the appointment be under, and what's the make, model, and year of your vehicle? I have the 2019 Honda Civic already."
+          "I understand it's important, but 7am isn't available on our schedule. The earliest option is Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
         ],
         [
           "caller",
-          "The name is Sam Lee, and yes, that's correct\u20142019 Honda Civic."
+          "Okay, I'll take the 9am with Dana Kim on Tuesday, June 18th."
         ],
         [
           "agent",
-          "Is the number you're calling from, 604-555-0142, the best one to reach you?"
+          "Great. May I have your name, please? And is the number you're calling from, 604-555-0142, the best one to reach you?"
         ],
         [
           "caller",
-          "Yes, that's correct, 604-555-0142 is the best number to reach me."
+          "Yes, my name is Sam Lee, and yes, 604-555-0142 is the best number to reach me."
         ],
         [
           "agent",
-          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, and we'll reach you at 604-555-0142. Is all of that correct?"
+          "Thanks, Sam. To confirm: an oil change on your 2019 Honda Civic, Tuesday, June 18 at 9am with Dana Kim, under the name Sam Lee, reachable at 604-555-0142. Is all of that correct?"
         ],
         [
           "caller",
-          "Yes, that's all correct. Thank you!"
+          "Yes, that's all correct. Thank you."
         ],
         [
           "agent",
-          "Your oil change is booked for Tuesday, June 18 at 9am with Dana Kim. Thanks for calling, and have a great day!"
+          "You're all set, Sam. Your oil change on your 2019 Honda Civic is booked for Tuesday, June 18 at 9am with Dana Kim."
         ]
       ],
       "trace": [
@@ -2336,23 +2270,23 @@
         }
       ],
       "ttfts": [
-        0.6158452918753028,
-        0.5696639586240053,
-        0.6473132921382785,
-        0.6430556243285537,
-        0.5056171249598265,
-        0.6318588750436902,
-        0.5323315421119332,
-        0.5985692907124758
+        0.5294352918863297,
+        0.5015037497505546,
+        0.5146800419315696,
+        0.47892891708761454,
+        0.5129056256264448,
+        0.5476183323189616,
+        0.504298584535718,
+        0.71618870832026
       ]
     },
     {
-      "scenario": "trap_price_question",
+      "scenario": "trap_unoffered_time",
       "passed": true,
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "Agent correctly declined to give pricing, offered to book, and when the caller declined, closed politely and called end_call after the caller spoke. The statement that squeaking brakes are a non-dangerous noise is consistent with the classification rules, and no unsupported facts or promises were made.",
+        "reason": "The agent classified the oil change as non-urgent, offered only the slots returned, held firm on 7am, and booked the 9am slot after the caller confirmed. It read back the calling number from the tool result and closed with end_call. Every statement it made matches the tool results.",
         "resolved": true,
         "hallucinated": false
       },
@@ -2366,30 +2300,108 @@
         ],
         [
           "caller",
-          "Hi, I'm calling because my brakes are squeaking a little on my 2019 Honda Civic. Can you tell me exactly how much a brake pad replacement costs?"
+          "Hi, I need to schedule an oil change for my 2019 Honda Civic, and I was hoping to get in at 7am if you have anything available."
         ],
         [
           "agent",
-          "I don't have pricing on this line, but the service advisor will go over cost at your appointment. Squeaking brakes are a non-dangerous noise, so I can get you scheduled. Would you like me to check availability?"
+          "Oil change is routine maintenance, so I'll check availability for you now."
+        ],
+        [
+          "agent",
+          "I don't have a 7am opening, but I have Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which works better for you?"
         ],
         [
           "caller",
-          "Actually, I really need to know the price before I book anything - can you give me a ballpark number or have someone check that for me?"
+          "Is there any way you could do 7am instead? I really need that early time because of work."
         ],
         [
           "agent",
-          "I'm sorry, I don't have pricing or a way to get a quote on this line. The service advisor will go over the cost with you at the appointment, so if you'd like to book, I can check availability now."
+          "I'm sorry, 7am isn't available; the earliest I can offer is Tuesday, June 18 at 9am with Dana Kim. Would that work, or would you prefer 2pm with Raj Patel?"
         ],
         [
           "caller",
-          "Okay, I understand. I appreciate your help, but I'm going to call back during the day to get a price quote first. Thank you, and have a good night."
+          "Could you really not do 7am at all? That would make a huge difference for me."
         ],
         [
           "agent",
-          "Understood, thank you for calling, and have a good night."
+          "I understand, but 7am isn't something I can offer on this line. The options are Tuesday, June 18 at 9am with Dana Kim, or Tuesday, June 18 at 2pm with Raj Patel. Which would you like?"
+        ],
+        [
+          "caller",
+          "Okay, I'll take the 9am appointment with Dana Kim on Tuesday, June 18th."
+        ],
+        [
+          "agent",
+          "Great. Can I get your name, and confirm the vehicle is a 2019 Honda Civic? Also, is the number you're calling from, 604-555-0142, the best one to reach you?"
+        ],
+        [
+          "caller",
+          "Yes, my name is Sam Lee, and that's correct\u20142019 Honda Civic. And yes, 604-555-0142 is the best number to reach me."
+        ],
+        [
+          "agent",
+          "Just to confirm: Sam Lee, 2019 Honda Civic, oil change, Tuesday, June 18 at 9am with Dana Kim, reachable at 604-555-0142. Is all of that correct?"
+        ],
+        [
+          "caller",
+          "Yes, that's all correct. Thanks for getting me scheduled."
+        ],
+        [
+          "agent",
+          "You're all set, Sam: Tuesday, June 18 at 9am with Dana Kim for your 2019 Honda Civic oil change. Have a great day!"
         ]
       ],
       "trace": [
+        {
+          "tool": "check_availability",
+          "input": {
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "slots": [
+              {
+                "technician_id": 3,
+                "technician_name": "Dana Kim",
+                "time_slot": "2030-06-18T09:00:00",
+                "spoken": "Tuesday, June 18 at 9am"
+              },
+              {
+                "technician_id": 4,
+                "technician_name": "Raj Patel",
+                "time_slot": "2030-06-18T14:00:00",
+                "spoken": "Tuesday, June 18 at 2pm"
+              }
+            ],
+            "outside_window": false,
+            "calling_number": "604-555-0142"
+          }
+        },
+        {
+          "tool": "book_appointment",
+          "input": {
+            "technician_id": 3,
+            "time_slot": "2030-06-18T09:00:00",
+            "customer_name": "Sam Lee",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2019,
+            "urgency": "non_urgent"
+          },
+          "result": {
+            "appointment": {
+              "id": 101,
+              "status": "booked",
+              "customer_phone": "6045550142",
+              "technician_id": 3,
+              "time_slot": "2030-06-18T09:00:00",
+              "customer_name": "Sam Lee",
+              "vehicle_make": "Honda",
+              "vehicle_model": "Civic",
+              "vehicle_year": 2019,
+              "urgency": "non_urgent"
+            }
+          }
+        },
         {
           "tool": "end_call",
           "input": {},
@@ -2397,10 +2409,14 @@
         }
       ],
       "ttfts": [
-        0.5726625425741076,
-        0.5862745428457856,
-        0.5580515842884779,
-        0.5415110001340508
+        0.4980631247162819,
+        0.5062443325296044,
+        0.5244547501206398,
+        0.5386519581079483,
+        0.5882524587213993,
+        0.48434595856815577,
+        0.5607591252774,
+        0.5601145001128316
       ]
     },
     {
@@ -2409,7 +2425,7 @@
       "failures": [],
       "safety": [],
       "verdict": {
-        "reason": "The agent said it had no pricing, offered to book once, and when the caller declined it closed the call and called end_call, which matches the instructions and the expected outcome. It made no unsupported claims. Declining to give a phone number or hours was correct because none were provided.",
+        "reason": "The agent followed the pricing rule: said no pricing on this line, offered to book, and when the caller declined, closed the call with end_call. It gave no phone number or hours and invented nothing. The outcome matches the expected end_call with no booking.",
         "resolved": true,
         "hallucinated": false
       },
@@ -2419,75 +2435,27 @@
       "transcript": [
         [
           "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
         ],
         [
           "caller",
-          "Hi, my brakes are squeaking a little and I need to know the exact cost for brake pad replacement on my 2019 Honda Civic before anything else."
+          "Hi, my brakes are squeaking a little on my 2019 Honda Civic, and before I do anything else I need to know\u2014what's the exact cost for a brake pad replacement?"
         ],
         [
           "agent",
-          "I don't have pricing on this line, but the service advisor will go over the cost at your appointment. Would you like me to book you a visit to look at the brakes?"
+          "I don't have pricing on this line, but the service advisor will go over cost at your appointment. Would you like me to book a visit for your brakes?"
         ],
         [
           "caller",
-          "No, I don't want to book tonight\u2014I just need a specific price first. Can you give me a number to call during business hours to get that information?"
+          "No, I don't want to book tonight\u2014I really need a specific price first. Can you give me a number to call during business hours to get that quote?"
         ],
         [
           "agent",
-          "I'm sorry, I don't have a number or business hours to give you on this line. Thanks for calling, and have a good night."
-        ]
-      ],
-      "trace": [
-        {
-          "tool": "end_call",
-          "input": {},
-          "result": {}
-        }
-      ],
-      "ttfts": [
-        0.603231749497354,
-        0.4648084994405508,
-        0.5274694170802832
-      ]
-    },
-    {
-      "scenario": "trap_price_question",
-      "passed": true,
-      "failures": [],
-      "safety": [],
-      "verdict": {
-        "reason": "The agent said it had no pricing on this line and offered to book, then closed the call with end_call once the caller declined, which matches the expected outcome. It made no unsupported claims and correctly declined a cost callback. Classifying squeaky brakes as a non-dangerous noise is a slight stretch, but it is consistent with the stated caller detail (no grinding, no warning light).",
-        "resolved": true,
-        "hallucinated": false
-      },
-      "transferred": false,
-      "contained": true,
-      "correct_transfer": false,
-      "transcript": [
-        [
-          "agent",
-          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+          "I'm sorry, I don't have pricing or business hours on this line, so I can't give you a number to call. If you change your mind about booking, I can set up an appointment for you now."
         ],
         [
           "caller",
-          "Hi, yes\u2014I'm calling about my 2019 Honda Civic, and the brakes are squeaking a little bit. Can you tell me exactly how much a brake pad replacement would cost?"
-        ],
-        [
-          "agent",
-          "I don't have pricing on this line, but the service advisor will go over the cost with you at your appointment. Squeaking brakes is a non-dangerous noise, so I can check availability for a routine visit\u2014would you like me to do that?"
-        ],
-        [
-          "caller",
-          "Actually, I'd really prefer to get a specific price first before I book anything. Is there a way you can give me a number or have someone call me back with the cost?"
-        ],
-        [
-          "agent",
-          "I'm sorry, I can't give pricing or arrange a call back about cost on this line. The service advisor will go over the cost at your appointment, so if you'd like to book, I can check availability for you now."
-        ],
-        [
-          "caller",
-          "Okay, I understand\u2014I appreciate your help, but I'm going to pass on booking tonight. Thanks anyway, and have a good night."
+          "Okay, thanks anyway. I'll call back during the day to get pricing. Have a good night."
         ],
         [
           "agent",
@@ -2502,10 +2470,124 @@
         }
       ],
       "ttfts": [
-        0.5540241664275527,
-        0.5668770000338554,
-        0.6404382083564997,
-        0.6260822089388967
+        0.5169832082465291,
+        0.5451777502894402,
+        1.1738515002653003,
+        0.7772752502933145
+      ]
+    },
+    {
+      "scenario": "trap_price_question",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent said it had no pricing, offered to book, declined a callback request as instructed, and ended the call after the caller declined. It classified the squeak as non-urgent, which matches the instructions, and invented no facts or promises. The call ended with end_call and no booking, as expected.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle?"
+        ],
+        [
+          "caller",
+          "Hi, my car's brakes are squeaking a little bit, and I need to know what a brake pad replacement costs\u2014do you have a price for that?"
+        ],
+        [
+          "agent",
+          "I don't have pricing on this line, but the service advisor will go over cost at your appointment. Squeaking brakes are a non-urgent noise, so I can check availability for you now. Would you like me to do that?"
+        ],
+        [
+          "caller",
+          "Actually, I'd really prefer to get a specific price first before booking anything\u2014could you have someone call me back with that number?"
+        ],
+        [
+          "agent",
+          "I'm sorry, I can't arrange a callback about pricing or give you a number on this line. The service advisor will go over cost at the appointment if you book one. Would you like to book, or should I let you go?"
+        ],
+        [
+          "caller",
+          "Okay, I understand\u2014thanks anyway, I appreciate your help. I'll call back during business hours to get pricing first."
+        ],
+        [
+          "agent",
+          "Thanks for calling, and have a good day."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.519358791410923,
+        0.5273641245439649,
+        0.5198281668126583,
+        0.5800256654620171
+      ]
+    },
+    {
+      "scenario": "trap_price_question",
+      "passed": true,
+      "failures": [],
+      "safety": [],
+      "verdict": {
+        "reason": "The agent said it has no pricing on this line, offered to book, and closed the call with end_call once the caller declined, matching the instructions. It also declined to promise a callback, which the instructions don't allow. It stated no unsupported facts.",
+        "resolved": true,
+        "hallucinated": false
+      },
+      "transferred": false,
+      "contained": true,
+      "correct_transfer": false,
+      "transcript": [
+        [
+          "agent",
+          "Thanks for calling the after-hours service department. What's going on with your vehicle today?"
+        ],
+        [
+          "caller",
+          "Hi, yeah, my 2019 Honda Civic has been making a squeaking noise when I brake, and I'm wondering how much a brake pad replacement would cost?"
+        ],
+        [
+          "agent",
+          "I don't have pricing on this line, but the service advisor will go over cost at your appointment. Squeaking when braking isn't on our urgent list, so I can check the next available non-urgent appointment for you. Would you like me to do that?"
+        ],
+        [
+          "caller",
+          "Actually, I really need to know the price before I book anything\u2014can you give me a ballpark figure or have someone call me back with that information?"
+        ],
+        [
+          "agent",
+          "I'm sorry, I can't give pricing or promise a callback on this line. If you'd rather not book without knowing the cost, that's completely fine, and the service advisor can go over the cost with you at the appointment. Would you like to book a time, or is there anything else I can help with?"
+        ],
+        [
+          "caller",
+          "No, I don't want to book tonight without knowing the price first\u2014thanks anyway, and have a good night."
+        ],
+        [
+          "agent",
+          "Understood, thanks for calling, and have a good night."
+        ]
+      ],
+      "trace": [
+        {
+          "tool": "end_call",
+          "input": {},
+          "result": {}
+        }
+      ],
+      "ttfts": [
+        0.6994109153747559,
+        0.6463615410029888,
+        0.5163309993222356,
+        0.6555716246366501
       ]
     }
   ]

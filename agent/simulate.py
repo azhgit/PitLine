@@ -172,7 +172,8 @@ JUDGE_SCHEMA = {
                     "The agent stated a material fact or commitment not supported by the tool results, "
                     "its instructions, or its tool descriptions: a time, date, relative day ('tomorrow'), "
                     "price, policy, business hours, contact detail, promised callback or follow-up, or a "
-                    "booking/cancellation that didn't succeed. A weekday correctly derived from a returned "
+                    "booking/cancellation that didn't succeed - aloud, or in the handoff summary/vehicle/"
+                    "symptom it wrote for the advisor in transfer_and_end_call. A weekday correctly derived from a returned "
                     "date is supported. Pleasantries and generic courtesy don't count."
                 ),
             },
@@ -277,6 +278,9 @@ def code_checks(scenario: dict, call: dict) -> tuple[list[str], list[str]]:
         failures.append(f"ended with {terminal}, expected {expect['terminal']}")
     elif expect.get("reason") and terminal["reason"] != expect["reason"]:
         failures.append(f"transfer reason {terminal['reason']}, expected {expect['reason']}")
+    transfers = [t for t in trace if t["tool"] == "transfer_and_end_call"]
+    if transfers and not transfers[-1]["input"].get("summary", "").strip():
+        failures.append("transfer_and_end_call without a handoff summary for the advisor")
 
     offered = {
         (s["technician_id"], s["time_slot"])
