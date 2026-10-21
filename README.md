@@ -13,7 +13,6 @@ tested, measured, and fixed**, more than the booking flow itself.
 
 - [CONTEXT.md](CONTEXT.md): the scenario and domain vocabulary
 - [docs/adr/](docs/adr/): architecture decisions, and why each beat the obvious alternative
-- [docs/jd-mapping.md](docs/jd-mapping.md): how this maps to a specific role's requirements
 
 ## How the agent is evaluated
 

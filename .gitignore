@@ -10,3 +10,7 @@ latency_chart.png
 .coverage
 node_modules/
 .next/
+
+# Personal working notes - kept locally, not published
+doc/
+docs/jd-mapping.md
