@@ -1,31 +1,33 @@
 import os
 
-from fastapi import Header, HTTPException, Query
+from fastapi import Header, HTTPException, Query, Request
 
 
 def verify_api_key(
+    request: Request,
     x_api_key: str | None = Header(default=None),
     api_key: str | None = Query(default=None),
 ) -> None:
-    """Shared-secret check for agent/dashboard -> DMS calls - this mock DMS
-    otherwise has no authentication and is reachable by anyone who knows
-    DMS_BASE_URL.
+    """Two shared secrets, split by what they can do:
 
-    Accepts the key as a header (the agent's httpx client) or a query param
-    (the Ops Dashboard's browser-side EventSource for /events - the native
-    EventSource API can't set custom headers at all, so a query param is
-    the only way it can authenticate). The query-param path means the key
-    is visible in the dashboard's page source/network tab - acceptable
-    for this demo's mock data, not a pattern to reuse for anything real.
+    - DMS_API_KEY: full access, header only. Held by the agent and worker,
+      never by a browser.
+    - DASHBOARD_API_KEY: GET only. The Ops Dashboard ships it in its
+      browser bundle (NEXT_PUBLIC_*), so it must be treated as public - it
+      can read the schedule but can't book, cancel, claim jobs, or write
+      call records. Also accepted as a query param, because the dashboard's
+      EventSource for /events can't set headers.
 
-    Fails closed: an unset DMS_API_KEY rejects every request rather than
-    skipping the check, so auth can't be silently disabled by forgetting to
-    set the env var.
+    Before this split, the single key the dashboard exposed could cancel
+    anyone's appointment. Fails closed: an unset key accepts nothing.
     """
-    expected = os.environ.get("DMS_API_KEY")
-    provided = x_api_key or api_key
-    if not expected or provided != expected:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    full = os.environ.get("DMS_API_KEY")
+    read = os.environ.get("DASHBOARD_API_KEY")
+    if full and x_api_key == full:
+        return
+    if request.method == "GET" and read and (x_api_key or api_key) == read:
+        return
+    raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 def verify_review_key(x_review_key: str | None = Header(default=None)) -> None:
