@@ -102,6 +102,24 @@ under-predicted thinking time. Real calls showed it, and that's why thinking
 is off in production. After the change, real calls measured 0.46–0.81 s to
 the first spoken token on every turn.
 
+## Shipping prompt changes
+
+Prompt changes roll out in stages rather than all at once (see
+`PROMPT_VERSIONS` in [bot.py](agent/bot.py) and [rollout.py](agent/rollout.py)):
+
+1. Put the new prompt in `PROMPT_VERSIONS["candidate"]`.
+2. Gate it: `SIM_PROMPT_VERSION=candidate python simulate.py`. No rollout
+   starts until the gate passes.
+3. Ramp `CANDIDATE_PERCENT` on Railway: 1 → 10 → 50 → 100. Each call is
+   bucketed by a hash of its Twilio CallSid, so the same call always gets
+   the same version, and raising the percent only moves calls *onto* the
+   candidate.
+4. Compare versions using the `prompt_version` recorded in the call logs,
+   the per-stage latency log, and every handoff record.
+5. Promote the candidate to `stable`. To roll back at any step, set
+   `CANDIDATE_PERCENT=0`. That's an environment variable change, not a code
+   deploy.
+
 ## Handoffs
 
 When the agent transfers a call, the advisor gets a structured record (see
@@ -163,7 +181,7 @@ Some engineering choices that hold up under load, not just in a demo:
 ## Repo layout
 
 ```
-agent/       Pipecat pipeline (bot.py), SMS worker, simulator, evals, turn-taking
+agent/       Pipecat pipeline (bot.py), SMS worker, simulator, evals, turn-taking, prompt rollout
 dms/         FastAPI + Postgres DMS: appointments, technicians, handoffs, job queue, SSE
 dashboard/   Next.js + TypeScript ops dashboard
 docs/adr/    Architecture decision records

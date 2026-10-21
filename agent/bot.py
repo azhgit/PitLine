@@ -38,6 +38,7 @@ from call_close import CallCloseProcessor, CloseCallRequestedFrame
 from call_transfer import TRANSFER_MESSAGES
 from caller_id import lookup_caller_number, normalize_phone
 from latency_observer import LatencyLogObserver
+from rollout import pick_version
 from silence_timeout import SilenceTimeoutProcessor
 from thinking_filler import ThinkingFillerProcessor, ToolCallStartedFrame
 from turn_start import LateFinalTolerantTranscriptionStart
@@ -204,6 +205,14 @@ LLM_THINKING = "disabled"
 # Stands in for a user turn that had speech but no transcript - shared with
 # simulate.py. See on_user_turn_stopped in run_bot.
 INAUDIBLE_MESSAGE = "[inaudible: the caller spoke but nothing could be transcribed]"
+# Staged rollout of prompt changes (see rollout.py). To ship a change: put
+# the new prompt in "candidate", gate it with SIM_PROMPT_VERSION=candidate
+# python simulate.py, then ramp CANDIDATE_PERCENT on Railway (1 -> 10 ->
+# 50 -> 100) while comparing prompt_version in the logs and handoffs;
+# finally promote it to "stable" and clear "candidate". Rollback is
+# CANDIDATE_PERCENT=0 - no deploy of code.
+PROMPT_VERSIONS: dict[str, str | None] = {"stable": SYSTEM_INSTRUCTION, "candidate": None}
+
 KICKOFF_MESSAGE = "The caller just connected."
 # Spoken by code on connect, never generated: disclosure language (automated
 # assistant, recording) has to be word for word, which a model can't
@@ -367,11 +376,19 @@ def build_tool_schemas() -> list[FunctionSchema]:
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    call_sid = (getattr(runner_args, "call_data", None) or {}).get("call_id")
+    prompt_version = pick_version(
+        call_sid,
+        int(os.getenv("CANDIDATE_PERCENT", "0")),
+        has_candidate=PROMPT_VERSIONS["candidate"] is not None,
+    )
+    logger.info(f"call {call_sid}: prompt_version={prompt_version}")
+
     llm = AnthropicLLMService(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         settings=AnthropicLLMService.Settings(
             model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"),
-            system_instruction=SYSTEM_INSTRUCTION,
+            system_instruction=PROMPT_VERSIONS[prompt_version],
             thinking=AnthropicLLMService.ThinkingConfig(type=LLM_THINKING),
             # Not enable_prompt_caching=True: measured with eval_prompt_caching.py
             # against the real API - Haiku 4.5 needs >=4096 tokens to actually
@@ -430,8 +447,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     async def get_verified_caller_number() -> str | None:
         if "value" not in _caller_number_cache:
-            call_data = getattr(runner_args, "call_data", None) or {}
-            call_sid = call_data.get("call_id")
             _caller_number_cache["value"] = await lookup_caller_number(call_sid)
         return _caller_number_cache["value"]
 
@@ -576,6 +591,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             "caller_stated": {"vehicle": args.get("vehicle"), "symptom": args.get("symptom")},
             "verification": {"caller_id_verified": bool(caller_number), "method": "twilio_caller_id"},
             "tool_results": _tool_log,
+            "prompt_version": prompt_version,
         }
         try:
             response = await dms_client.post(
@@ -682,7 +698,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,  # feeds the TTFB/TTFA frames LatencyLogObserver reads
             enable_usage_metrics=True,
         ),
-        observers=[LatencyLogObserver()],
+        observers=[LatencyLogObserver(prompt_version=prompt_version)],
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 

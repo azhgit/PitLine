@@ -17,9 +17,10 @@ class LatencyLogObserver(BaseObserver):
     how many ms, which call) so Day 4 has something to chart.
     """
 
-    def __init__(self):
+    def __init__(self, prompt_version: str = "stable"):
         super().__init__()
         self._call_id = uuid.uuid4().hex[:8]
+        self._prompt_version = prompt_version  # per-version latency during a rollout
         self._frames_seen = set()
 
     async def on_push_frame(self, data: FramePushed):
@@ -48,6 +49,11 @@ class LatencyLogObserver(BaseObserver):
                 )
 
     def _write(self, **fields):
-        row = {"call_id": self._call_id, "wall_time": time.time(), **fields}
+        row = {
+            "call_id": self._call_id,
+            "prompt_version": self._prompt_version,
+            "wall_time": time.time(),
+            **fields,
+        }
         with open(LATENCY_LOG_PATH, "a") as f:
             f.write(json.dumps(row) + "\n")

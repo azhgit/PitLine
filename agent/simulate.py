@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import GREETING, INAUDIBLE_MESSAGE, KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import GREETING, INAUDIBLE_MESSAGE, KICKOFF_MESSAGE, LLM_THINKING, PROMPT_VERSIONS, add_spoken_times, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -40,6 +40,11 @@ load_dotenv(override=True)
 AGENT_MODEL = os.getenv("SIM_AGENT_MODEL") or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 # "disabled" to turn off thinking on models that default it on (Haiku 5.5)
 AGENT_THINKING = os.getenv("SIM_AGENT_THINKING", LLM_THINKING)
+# Gate a candidate prompt before ramping it: SIM_PROMPT_VERSION=candidate.
+PROMPT_VERSION = os.getenv("SIM_PROMPT_VERSION", "stable")
+SYSTEM_INSTRUCTION = PROMPT_VERSIONS[PROMPT_VERSION]
+if SYSTEM_INSTRUCTION is None:
+    sys.exit(f"bot.PROMPT_VERSIONS[{PROMPT_VERSION!r}] is empty - nothing to gate")
 CALLER_MODEL = os.getenv("SIM_CALLER_MODEL", "claude-haiku-4-5")
 JUDGE_MODEL = os.getenv("SIM_JUDGE_MODEL", "claude-sonnet-5-5")
 RUNS_PER_SCENARIO = 3
@@ -401,7 +406,7 @@ def main():
     with ThreadPoolExecutor(max_workers=4) as pool:
         runs = list(pool.map(lambda s: run_one(client, tools, s), jobs))
 
-    print(f"\nagent={AGENT_MODEL} thinking={AGENT_THINKING or 'default'} caller={CALLER_MODEL} judge={JUDGE_MODEL}\n")
+    print(f"\nagent={AGENT_MODEL} thinking={AGENT_THINKING or 'default'} prompt={PROMPT_VERSION} caller={CALLER_MODEL} judge={JUDGE_MODEL}\n")
     for s in SCENARIOS:
         mine = [r for r in runs if r["scenario"] == s["name"]]
         passed = sum(r["passed"] for r in mine)
@@ -432,6 +437,7 @@ def main():
         json.dump(
             {
                 "ran_at": datetime.now(timezone.utc).isoformat(),
+                "prompt_version": PROMPT_VERSION,
                 "models": {"agent": AGENT_MODEL, "agent_thinking": AGENT_THINKING, "caller": CALLER_MODEL, "judge": JUDGE_MODEL},
                 "summary": summary,
                 "runs": runs,
