@@ -1,7 +1,10 @@
-pipecat-ai[deepgram,elevenlabs,anthropic,silero,websocket,runner]
-python-dotenv
-httpx
-twilio
+# Pinned to the versions simulate.py and the evals were verified against -
+# an unpinned redeploy silently pulled pipecat-ai 1.13.0 on 2026-10-21.
+pipecat-ai[deepgram,elevenlabs,anthropic,silero,websocket,runner]==1.10.0
+anthropic==1.5.0
+python-dotenv==1.2.3
+httpx==0.28.1
+twilio==9.11.1
 
 # viz-only (agent/visualize_latency.py)
-matplotlib
+matplotlib==3.11.2

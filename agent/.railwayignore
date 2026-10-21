@@ -5,3 +5,4 @@ __pycache__/
 *.jsonl
 *.png
 .env
+sim_results*.json

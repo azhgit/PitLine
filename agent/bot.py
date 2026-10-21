@@ -77,6 +77,21 @@ SYSTEM_INSTRUCTION = (
     "you're having trouble reaching the system right now and someone will "
     "call them back shortly, then call end_call. This overrides every rule "
     "below - it can happen at any step.\n\n"
+    # Added after agent/simulate.py's baseline caught each of these in
+    # simulated calls (sim_results_baseline.json): "tomorrow" for a date
+    # the agent can't place, invented callbacks/hours/staff, and its own
+    # words spoken ahead of the fixed transfer line.
+    "Never state a fact or make a promise that a tool result or these "
+    "instructions didn't give you - no prices, business hours, phone "
+    "numbers, staff, callbacks, or follow-ups beyond the ones described "
+    "here (a cancellation callback is only ever offered when "
+    "outside_window is true). You don't know today's date: say a slot's weekday and date "
+    "(e.g. 'Tuesday, June 18 at 10am'), never 'today' or 'tomorrow'. If "
+    "asked about pricing, say you don't have pricing on this line and the "
+    "service advisor will go over cost at the appointment; offer to book, "
+    "and if they don't want to, close the call. When you call "
+    "transfer_and_end_call, say nothing yourself - it speaks the handoff "
+    "line on its own. Never call end_call before the caller has spoken.\n\n"
     "If the caller wants to check, reschedule, or cancel an EXISTING "
     "appointment (not describing a new problem), call find_appointment "
     "first - it looks up the caller's own record automatically off the "
@@ -239,7 +254,9 @@ def build_tool_schemas() -> list[FunctionSchema]:
                 "Speak a fixed line for the given reason, then end the call - "
                 "the Handoff simulation from CONTEXT.md. No real transfer "
                 "happens. Use this instead of continuing the conversation once "
-                "one of the listed situations applies."
+                "one of the listed situations applies. Call it with NO text of "
+                "your own in the same reply: it speaks the handoff line itself, "
+                "and anything you write would be spoken to the caller first."
             ),
             properties={
                 "reason": {
@@ -269,7 +286,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm = AnthropicLLMService(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         settings=AnthropicLLMService.Settings(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5"),
+            model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"),
             system_instruction=SYSTEM_INSTRUCTION,
             # Not enable_prompt_caching=True: measured with eval_prompt_caching.py
             # against the real API - Haiku 4.5 needs >=4096 tokens to actually
