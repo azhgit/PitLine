@@ -28,6 +28,8 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import BaseTransport
+from pipecat.turns.user_start import VADUserTurnStartStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
@@ -552,7 +554,17 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(params=_vad_params_from_env())
+            vad_analyzer=SileroVADAnalyzer(params=_vad_params_from_env()),
+            # VAD-only turn start - drops Pipecat's default
+            # TranscriptionUserTurnStartStrategy. On real calls (2026-10-21)
+            # Deepgram's last final landed ~30ms after smart-turn ended the
+            # turn; that strategy read it as a new turn, interrupted the
+            # in-flight reply, then timed out 5s later without inference -
+            # 13s of dead air and the caller's vehicle details lost. Late
+            # transcripts still land in the aggregation (see
+            # LLMUserAggregator._handle_transcription), so they ride along
+            # with the next turn instead. Stop strategy stays the default.
+            user_turn_strategies=UserTurnStrategies(start=[VADUserTurnStartStrategy()]),
         ),
     )
 
