@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import GREETING, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -33,10 +33,6 @@ MODELS = {
 # A plausible hardcoded greeting stands in for turn 1 (which we're not
 # grading) so every scenario starts from the same two-turn context the real
 # pipeline would have by the time the caller states their problem.
-GREETING = (
-    "Thanks for calling our dealership's after-hours service department. "
-    "What's going on with your vehicle?"
-)
 
 
 @dataclass

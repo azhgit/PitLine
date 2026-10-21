@@ -18,15 +18,11 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import LLM_THINKING, SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import GREETING, LLM_THINKING, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
-GREETING = (
-    "Thanks for calling our dealership's after-hours service department. "
-    "What's going on with your vehicle?"
-)
 
 
 def first_tool_use(message):

@@ -12,7 +12,6 @@ from pipecat.frames.frames import (
     EndFrame,
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
-    LLMRunFrame,
     TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -125,11 +124,12 @@ SYSTEM_INSTRUCTION = (
     "1. Ask what's wrong with the vehicle if they haven't said, then "
     "classify the urgency from their description. Use this fixed category "
     "list, don't improvise:\n"
-    "   - urgency 'urgent': brake problems (grinding, a soft pedal, or a "
-    "warning light), steering or suspension failure, an active fluid leak, "
-    "overheating or smoke, or an airbag warning light.\n"
+    "   - urgency 'urgent': brakes that are grinding, have a soft pedal, "
+    "or have their warning light on; steering or suspension failure, an "
+    "active fluid leak, overheating or smoke, or an airbag warning light.\n"
     "   - urgency 'non_urgent': routine maintenance (oil change, tire "
-    "rotation, inspection), a non-dangerous noise, or an infotainment/"
+    "rotation, inspection), a non-dangerous noise - including a light "
+    "brake squeak with none of the urgent brake signs - or an infotainment/"
     "electrical nuisance - anything not on the urgent list above.\n"
     "   If what they said doesn't make sense - including an "
     "'[inaudible: ...]' message, which means they spoke but nothing could "
@@ -204,10 +204,14 @@ LLM_THINKING = "disabled"
 # Stands in for a user turn that had speech but no transcript - shared with
 # simulate.py. See on_user_turn_stopped in run_bot.
 INAUDIBLE_MESSAGE = "[inaudible: the caller spoke but nothing could be transcribed]"
-KICKOFF_MESSAGE = (
-    "The caller just connected. Greet them in one short sentence as the "
-    "dealership's after-hours service department line, then ask what's "
-    "going on with their vehicle."
+KICKOFF_MESSAGE = "The caller just connected."
+# Spoken by code on connect, never generated: disclosure language (automated
+# assistant, recording) has to be word for word, which a model can't
+# guarantee. Also skips an LLM round trip before the caller hears anything.
+GREETING = (
+    "Thanks for calling the after-hours service department. You're speaking "
+    "with an automated assistant, and this call may be recorded. What's going "
+    "on with your vehicle?"
 )
 
 
@@ -607,9 +611,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     tools = build_tool_schemas()
 
     # Seeded as a "user" turn, not "system": Anthropic's context requires the
-    # message list to start with a real conversational role, and this message
-    # is a one-time kickoff instruction, not the persistent system prompt
-    # (that's SYSTEM_INSTRUCTION above, passed via Settings).
+    # message list to start with a real conversational role. GREETING joins
+    # the context as the assistant's turn once on_client_connected speaks it
+    # (TTSSpeakFrame appends to context by default).
     context = LLMContext([{"role": "user", "content": KICKOFF_MESSAGE}], tools=tools)
     # Hard-stop barge-in (plan's Day 3 requirement) is Pipecat's own default
     # here, not something built for this project: the VAD-based turn-start
@@ -700,8 +704,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info("Twilio stream connected - kicking off greeting")
-        await worker.queue_frames([LLMRunFrame()])
+        logger.info("Twilio stream connected - speaking greeting")
+        await worker.queue_frames([TTSSpeakFrame(text=GREETING)])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

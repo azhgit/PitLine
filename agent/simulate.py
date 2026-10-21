@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import INAUDIBLE_MESSAGE, KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import GREETING, INAUDIBLE_MESSAGE, KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -217,13 +217,43 @@ def stub_tool(scenario: dict, name: str, args: dict) -> dict:
 
 
 def run_call(client: Anthropic, tools: list, scenario: dict) -> dict:
-    agent_msgs = [{"role": "user", "content": KICKOFF_MESSAGE}]
-    transcript = []  # [(speaker, text)] - what was actually said aloud
+    # Same opening state as production: code speaks GREETING, then the caller.
+    agent_msgs = [{"role": "user", "content": KICKOFF_MESSAGE}, {"role": "assistant", "content": GREETING}]
+    transcript = [("agent", GREETING)]  # [(speaker, text)] - what was actually said aloud
     trace = []  # [{tool, input, result}]
     terminal = None
     caller_turns = 0
     ttfts = []  # seconds to the first spoken (text) token - what TTS waits on
     extra = {"thinking": {"type": AGENT_THINKING}} if AGENT_THINKING else {}
+
+    def caller_turn() -> bool:
+        """Caller answers the agent's last line; False if they hang up.
+        Roles are flipped for the caller model: the agent's lines are its
+        "user" turns."""
+        nonlocal caller_turns
+        caller_msgs = []
+        for who, said in transcript:
+            role = "user" if who == "agent" else "assistant"
+            if caller_msgs and caller_msgs[-1]["role"] == role:
+                caller_msgs[-1]["content"] += " " + said
+            else:
+                caller_msgs.append({"role": role, "content": said})
+        if "fixed_caller_line" in scenario:
+            said = scenario["fixed_caller_line"]
+        else:
+            reply = client.messages.create(
+                model=CALLER_MODEL, max_tokens=150, system=CALLER_SYSTEM + scenario["persona"], messages=caller_msgs
+            )
+            said = reply.content[0].text.strip()
+        caller_turns += 1
+        if "[HANGUP]" in said:
+            return False
+        transcript.append(("caller", said))
+        agent_msgs.append({"role": "user", "content": said})
+        return True
+
+    if not caller_turn():
+        return {"transcript": transcript, "trace": trace, "terminal": terminal, "ttfts": ttfts}
 
     while terminal is None and caller_turns < MAX_CALLER_TURNS:
         start, ttft = time.perf_counter(), None
@@ -258,27 +288,9 @@ def run_call(client: Anthropic, tools: list, scenario: dict) -> dict:
                 agent_msgs.append({"role": "user", "content": results})
             continue
 
-        # Agent spoke and is waiting - caller's turn. Roles are flipped for
-        # the caller model: the agent's lines are its "user" turns.
-        caller_msgs = []
-        for who, said in transcript:
-            role = "user" if who == "agent" else "assistant"
-            if caller_msgs and caller_msgs[-1]["role"] == role:
-                caller_msgs[-1]["content"] += " " + said
-            else:
-                caller_msgs.append({"role": role, "content": said})
-        if "fixed_caller_line" in scenario:
-            said = scenario["fixed_caller_line"]
-        else:
-            reply = client.messages.create(
-                model=CALLER_MODEL, max_tokens=150, system=CALLER_SYSTEM + scenario["persona"], messages=caller_msgs
-            )
-            said = reply.content[0].text.strip()
-        caller_turns += 1
-        if "[HANGUP]" in said:
+        # Agent spoke and is waiting - caller's turn.
+        if not caller_turn():
             break
-        transcript.append(("caller", said))
-        agent_msgs.append({"role": "user", "content": said})
 
     return {"transcript": transcript, "trace": trace, "terminal": terminal, "ttfts": ttfts}
 
