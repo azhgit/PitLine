@@ -12,6 +12,7 @@ from sse_starlette.sse import EventSourceResponse
 from appointments import router as appointments_router
 from auth import verify_api_key
 from availability import router as availability_router
+from calls import router as calls_router
 from db import Base, engine
 from events import broadcaster
 from handoffs import router as handoffs_router
@@ -48,6 +49,8 @@ app.include_router(appointments_router, dependencies=[Depends(verify_api_key)])
 app.include_router(availability_router, dependencies=[Depends(verify_api_key)])
 app.include_router(handoffs_router, dependencies=[Depends(verify_api_key)])
 app.include_router(jobs_router, dependencies=[Depends(verify_api_key)])
+# Per-route auth: stats/writes take DMS_API_KEY, transcripts take REVIEW_API_KEY.
+app.include_router(calls_router)
 
 
 @app.get("/health")

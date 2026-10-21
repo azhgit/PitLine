@@ -3,6 +3,7 @@ from datetime import timedelta
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_dms.db"
 os.environ["DMS_API_KEY"] = "test-api-key"
+os.environ["REVIEW_API_KEY"] = "test-review-key"
 
 import pytest
 from fastapi.testclient import TestClient

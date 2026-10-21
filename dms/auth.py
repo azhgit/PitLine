@@ -26,3 +26,14 @@ def verify_api_key(
     provided = x_api_key or api_key
     if not expected or provided != expected:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+def verify_review_key(x_review_key: str | None = Header(default=None)) -> None:
+    """Separate secret for reading call transcripts. DMS_API_KEY ships to
+    the dashboard's browser bundle (see verify_api_key), so anything it can
+    read is effectively public; transcripts must not be. Header only - no
+    query-param fallback - and fails closed like verify_api_key.
+    """
+    expected = os.environ.get("REVIEW_API_KEY")
+    if not expected or x_review_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing review key")

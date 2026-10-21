@@ -95,6 +95,32 @@ class Handoff(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class Call(Base):
+    """One finished phone call, written by the agent on disconnect: the
+    basis for real-traffic containment and for running the simulator's
+    judge over real transcripts (agent/review_calls.py).
+
+    Outcome is decided by the agent's code from its tool log, never by the
+    model. transcript has the booked name and calling number redacted, and
+    is readable only with REVIEW_API_KEY - see calls.py.
+    """
+
+    __tablename__ = "calls"
+
+    id = Column(Integer, primary_key=True)
+    call_sid = Column(String, nullable=True)
+    # booked / cancelled / resolved_no_action / transferred / abandoned
+    outcome = Column(String, nullable=False)
+    transfer_reason = Column(String, nullable=True)
+    prompt_version = Column(String, nullable=False)
+    caller_verified = Column(Boolean, nullable=False)
+    caller_last4 = Column(String, nullable=True)  # never the full number here
+    transcript = Column(JSON, nullable=False)  # [{"role": "agent"|"caller", "text": ...}]
+    tool_log = Column(JSON, nullable=False)
+    review = Column(JSON, nullable=True)  # judge verdict, set by review_calls.py
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class Job(Base):
     """Follow-up job queue - a row enqueued (same transaction as the
     Appointment/Handoff write it follows from) when a call ends, drained by

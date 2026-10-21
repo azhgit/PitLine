@@ -60,12 +60,29 @@ correctness, hallucination rate, and time to first spoken token.
 - [eval_edge_cases.py](agent/eval_edge_cases.py) covers single-turn edge
   cases. It also runs on production's thinking setting.
 
-### 3. Real calls, read from production logs
+### 3. Real calls, recorded and reviewed
 
 The simulator is text-only, so it can't see speech-to-text errors or
 turn-taking timing. Real calls are where those bugs appeared (see below).
-Each call was diagnosed from the Railway logs: per-turn latency, what STT
-actually heard, which turn-taking strategy fired.
+
+Every call writes one record to the DMS when it ends. The record holds the
+transcript, the tool log, and the prompt version, plus an **outcome decided
+by code from the tool log, not by the model**. There are five outcomes:
+booked, cancelled, resolved without action, transferred, and caller hung up.
+That gives real-traffic containment with no model in the loop.
+
+[review_calls.py](agent/review_calls.py) then runs the **same judge** the
+simulator uses over every unreviewed call and writes its verdict back. The
+judge can overturn a "resolved" call that it decides wasn't actually
+resolved. The dashboard shows both numbers side by side: containment by
+recorded outcome, and containment as judged.
+
+Transcripts are stored with the booked name and every phone number
+redacted, and they can be read only with a separate `REVIEW_API_KEY`. The
+dashboard's key can see aggregate stats only (see limitations).
+
+Deeper diagnosis still comes from the Railway logs: per-turn latency, what
+STT actually heard, which turn-taking strategy fired.
 
 ## What testing found and what changed
 
@@ -233,6 +250,15 @@ call it.
 - **Quiet speech that VAD misses** gets a reply only after Pipecat's 5 s
   turn timeout. That's better than the 22 s it was, but it isn't instant.
 - **The handoff is simulated.** There's no live transfer to a person.
+- **Transcript redaction only covers what a tool saw.** The booked name and
+  the phone numbers are redacted. A name the caller gave before a transfer,
+  or digits STT spelled out as words, stay in the transcript. The next step
+  is NER or an LLM redaction pass. There's also no retention policy yet; a
+  real deployment would purge transcripts after a fixed window.
+- **The dashboard's DMS key is public.** It's a `NEXT_PUBLIC_` variable, so
+  it ships in the browser bundle, and anything it can read is effectively
+  public. That's why transcripts sit behind a second key. The real fix is a
+  server-side proxy, so the browser never holds a DMS key at all.
 - **Schema changes are hand-written, idempotent `ALTER`s** at DMS startup.
   They'll move to Alembic the next time a column changes.
 - Single dealership, fixed seed data, English only.

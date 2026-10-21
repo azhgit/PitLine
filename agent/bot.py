@@ -34,6 +34,7 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
 
+import call_record
 from call_close import CallCloseProcessor, CloseCallRequestedFrame
 from call_transfer import TRANSFER_MESSAGES
 from caller_id import lookup_caller_number, normalize_phone
@@ -621,8 +622,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm.register_function("book_appointment", logged("book_appointment", book_appointment))
     llm.register_function("find_appointment", logged("find_appointment", find_appointment))
     llm.register_function("cancel_appointment", logged("cancel_appointment", cancel_appointment))
-    llm.register_function("transfer_and_end_call", transfer_and_end_call)
-    llm.register_function("end_call", end_call)
+    llm.register_function("transfer_and_end_call", logged("transfer_and_end_call", transfer_and_end_call))
+    llm.register_function("end_call", logged("end_call", end_call))
 
     tools = build_tool_schemas()
 
@@ -723,10 +724,51 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info("Twilio stream connected - speaking greeting")
         await worker.queue_frames([TTSSpeakFrame(text=GREETING)])
 
+    _recorded = {"done": False}
+
+    async def record_call():
+        # Called from both the caller hanging up (on_client_disconnected) and
+        # the pipeline ending after the agent hangs up (on_pipeline_finished)
+        # - whichever comes first writes the row.
+        if _recorded["done"]:
+            return
+        _recorded["done"] = True
+        # One row per call for real-traffic containment and transcript
+        # review (review_calls.py). Outcome comes from the tool log, not the
+        # model; the transcript has the booked name and phone numbers
+        # redacted. Best-effort: a failed write never affects the call.
+        try:
+            caller_number = await get_verified_caller_number()
+            digits = normalize_phone(caller_number or "")
+            outcome, transfer_reason = call_record.classify(_tool_log)
+            terms = call_record.redaction_terms(_tool_log, caller_number)
+            response = await dms_client.post(
+                "/calls",
+                json={
+                    "call_sid": call_sid,
+                    "outcome": outcome,
+                    "transfer_reason": transfer_reason,
+                    "prompt_version": prompt_version,
+                    "caller_verified": bool(caller_number),
+                    "caller_last4": digits[-4:] or None,
+                    "transcript": call_record.transcript(context.get_messages(), KICKOFF_MESSAGE, terms),
+                    "tool_log": _tool_log,
+                },
+            )
+            response.raise_for_status()
+            logger.info(f"call {call_sid}: outcome={outcome} prompt_version={prompt_version}")
+        except Exception as e:
+            logger.error(f"call record write failed: {e}")
+
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
+        await record_call()
         await worker.cancel()
         await dms_client.aclose()
+
+    @worker.event_handler("on_pipeline_finished")
+    async def on_pipeline_finished(worker, frame):
+        await record_call()
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint, force_gc=True)
     await runner.add_workers(worker)

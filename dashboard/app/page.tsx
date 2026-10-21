@@ -37,6 +37,20 @@ type Handoff = {
 
 const UNVERIFIED_CALLER = "Unverified caller";
 
+// Aggregates only (dms/calls.py stats) - transcripts need a separate key
+// this page never has.
+type CallStats = {
+  total: number;
+  by_outcome: Record<string, number>;
+  containment_by_rule: number | null;
+  containment_judged: number | null;
+  hallucination_rate: number | null;
+  reviewed: number;
+};
+
+// Calls are written when they end and don't come over SSE, so stats poll.
+const CALL_STATS_POLL_MS = 30_000;
+
 type Technician = {
   id: number;
   name: string;
@@ -127,6 +141,25 @@ export default function Page() {
   // of the render output React tracks.
   const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [callStats, setCallStats] = useState<CallStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStats() {
+      try {
+        const res = await fetch(authedUrl("/calls/stats"));
+        if (res.ok && !cancelled) setCallStats(await res.json());
+      } catch {
+        // Non-critical panel: keep the last good numbers.
+      }
+    }
+    loadStats();
+    const timer = setInterval(loadStats, CALL_STATS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -219,6 +252,8 @@ export default function Page() {
           </div>
         )}
 
+        {callStats && <CallStatsPanel stats={callStats} />}
+
         <section className="mb-10">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
             Technician Schedule
@@ -279,6 +314,41 @@ function ConnectionBadge({ state }: { state: ConnectionState }) {
       <span className={`h-2 w-2 rounded-full ${config.dot}`} />
       {config.label}
     </div>
+  );
+}
+
+function pct(value: number | null): string {
+  return value === null ? "-" : `${Math.round(value * 100)}%`;
+}
+
+function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3">
+      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+    </div>
+  );
+}
+
+function CallStatsPanel({ stats }: { stats: CallStats }) {
+  const count = (outcome: string) => stats.by_outcome[outcome] ?? 0;
+  return (
+    <section className="mb-10">
+      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-400">
+        Calls ({stats.total})
+      </h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile label="Containment" value={pct(stats.containment_by_rule)} hint="By recorded outcome" />
+        <StatTile
+          label="Containment, judged"
+          value={pct(stats.containment_judged)}
+          hint={`LLM judge, ${stats.reviewed} reviewed`}
+        />
+        <StatTile label="Transferred" value={String(count("transferred"))} />
+        <StatTile label="Caller hung up" value={String(count("abandoned"))} />
+      </div>
+    </section>
   );
 }
 
