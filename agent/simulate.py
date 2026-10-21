@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.adapters.services.anthropic_adapter import AnthropicLLMAdapter
 
-from bot import KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
+from bot import INAUDIBLE_MESSAGE, KICKOFF_MESSAGE, LLM_THINKING, add_spoken_times, SYSTEM_INSTRUCTION, build_tool_schemas
 
 load_dotenv(override=True)
 
@@ -93,6 +93,16 @@ SCENARIOS = [
     {
         "name": "unintelligible_transfers",
         "persona": "You are on a terrible connection. Every single reply you give is only garbled syllables like 'mgrhh sldkf ptoo... brrk... nnh', never a real word, no matter what the agent says.",
+        "tools": {},
+        "expect": {"terminal": "transfer_and_end_call", "reason": "cannot_understand_caller", "book": False},
+        "contained": False,
+    },
+    {
+        # What bot.py feeds the LLM when VAD heard speech but STT produced no
+        # text - fixed, since an LLM caller can't be trusted to emit it.
+        "name": "inaudible_transfers",
+        "persona": "Your speech never transcribes.",
+        "fixed_caller_line": INAUDIBLE_MESSAGE,
         "tools": {},
         "expect": {"terminal": "transfer_and_end_call", "reason": "cannot_understand_caller", "book": False},
         "contained": False,
@@ -202,6 +212,7 @@ def stub_tool(scenario: dict, name: str, args: dict) -> dict:
     add_spoken_times(result.get("slots", []) + result.get("appointments", []))
     if name == "check_availability" and "error" not in result:
         result["calling_number"] = f"{CALLER_ID[:3]}-{CALLER_ID[3:6]}-{CALLER_ID[6:]}"
+        result["today"] = "Monday, June 17"  # the stub slots fall on 2030-06-18, a Tuesday
     return result
 
 
@@ -256,10 +267,13 @@ def run_call(client: Anthropic, tools: list, scenario: dict) -> dict:
                 caller_msgs[-1]["content"] += " " + said
             else:
                 caller_msgs.append({"role": role, "content": said})
-        reply = client.messages.create(
-            model=CALLER_MODEL, max_tokens=150, system=CALLER_SYSTEM + scenario["persona"], messages=caller_msgs
-        )
-        said = reply.content[0].text.strip()
+        if "fixed_caller_line" in scenario:
+            said = scenario["fixed_caller_line"]
+        else:
+            reply = client.messages.create(
+                model=CALLER_MODEL, max_tokens=150, system=CALLER_SYSTEM + scenario["persona"], messages=caller_msgs
+            )
+            said = reply.content[0].text.strip()
         caller_turns += 1
         if "[HANGUP]" in said:
             break
@@ -367,10 +381,12 @@ def run_one(client: Anthropic, tools: list, scenario: dict) -> dict:
 
 def main():
     out_path = sys.argv[1] if len(sys.argv) > 1 else "sim_results.json"
-    client = Anthropic()
+    # Retries ride out 429s - this org's 500k input-tokens/min limit is
+    # shared with the live agent, so the suite also runs at modest concurrency.
+    client = Anthropic(max_retries=8)
     tools = AnthropicLLMAdapter().to_provider_tools_format(ToolsSchema(standard_tools=build_tool_schemas()))
     jobs = [s for s in SCENARIOS for _ in range(RUNS_PER_SCENARIO)]
-    with ThreadPoolExecutor(max_workers=9) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         runs = list(pool.map(lambda s: run_one(client, tools, s), jobs))
 
     print(f"\nagent={AGENT_MODEL} thinking={AGENT_THINKING or 'default'} caller={CALLER_MODEL} judge={JUDGE_MODEL}\n")

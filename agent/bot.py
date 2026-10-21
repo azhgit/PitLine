@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
@@ -10,6 +11,7 @@ from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     EndFrame,
     FunctionCallResultProperties,
+    LLMMessagesAppendFrame,
     LLMRunFrame,
     TTSSpeakFrame,
 )
@@ -89,8 +91,12 @@ SYSTEM_INSTRUCTION = (
     "instructions didn't give you - no prices, business hours, phone "
     "numbers, staff, callbacks, or follow-ups beyond the ones described "
     "here (a cancellation callback is only ever offered when "
-    "outside_window is true). You don't know today's date: say a slot's weekday and date "
-    "(e.g. 'Tuesday, June 18 at 10am'), never 'today' or 'tomorrow'. If "
+    "outside_window is true). Say a slot's day using its 'spoken' field "
+    "(e.g. 'Tuesday, June 18 at 10am'). check_availability's 'today' is the "
+    "dealership's current date - only say 'today' or 'tomorrow' when that "
+    "field backs it up, even when echoing the caller. Don't give mechanical, diagnostic, "
+    "or safety advice (like whether it's safe to drive) - that's the "
+    "technician's call, not yours. If "
     "asked about pricing, say you don't have pricing on this line and the "
     "service advisor will go over cost at the appointment; offer to book, "
     "and if they don't want to, close the call. When you call "
@@ -125,10 +131,12 @@ SYSTEM_INSTRUCTION = (
     "   - urgency 'non_urgent': routine maintenance (oil change, tire "
     "rotation, inspection), a non-dangerous noise, or an infotainment/"
     "electrical nuisance - anything not on the urgent list above.\n"
-    "   If what they said doesn't make sense, ask them to repeat it once. "
-    "If it's still unclear the second time, call transfer_and_end_call "
-    "with reason 'cannot_understand_caller' instead of continuing to "
-    "guess.\n"
+    "   If what they said doesn't make sense - including an "
+    "'[inaudible: ...]' message, which means they spoke but nothing could "
+    "be transcribed - ask them to repeat it once. If the very next reply is "
+    "still unclear, you MUST call transfer_and_end_call with reason "
+    "'cannot_understand_caller' - don't ask a third time or keep "
+    "guessing.\n"
     "2. Call check_availability with that urgency. Its result has 'slots' "
     "and 'outside_window':\n"
     "   - slots non-empty, outside_window false: read them back as "
@@ -175,11 +183,27 @@ def add_spoken_times(items: list[dict]) -> list[dict]:
     return items
 
 
+# Same as dms/dealership_tz.py - slot times are dealership wall-clock time.
+DEALERSHIP_TZ = ZoneInfo("America/Vancouver")
+
+
+def spoken_today() -> str:
+    """The dealership's current date, so "tomorrow" is a checkable fact
+    rather than the model's guess - it echoed a caller's "tomorrow" in
+    simulate.py runs despite a prompt rule against it.
+    """
+    now = datetime.now(DEALERSHIP_TZ)
+    return f"{now:%A, %B} {now.day}"
+
+
 # Haiku 5.5 thinks by default and Pipecat only auto-disables that for
 # Sonnet. A real call on 2026-10-21 measured 0.3-2.6s of thinking per turn
 # on top of a ~0.6s first byte; simulate.py with thinking off held 96%.
 # Shared with simulate.py so the suite tests what production runs.
 LLM_THINKING = "disabled"
+# Stands in for a user turn that had speech but no transcript - shared with
+# simulate.py. See on_user_turn_stopped in run_bot.
+INAUDIBLE_MESSAGE = "[inaudible: the caller spoke but nothing could be transcribed]"
 KICKOFF_MESSAGE = (
     "The caller just connected. Greet them in one short sentence as the "
     "dealership's after-hours service department line, then ask what's "
@@ -307,7 +331,9 @@ def build_tool_schemas() -> list[FunctionSchema]:
                     "description": (
                         "One or two sentences for the service advisor taking "
                         "over: what the caller needs and what's already been "
-                        "tried. Only what the caller said or a tool returned."
+                        "tried. Only what the caller said or a tool returned - "
+                        "if they couldn't be understood, say exactly that "
+                        "rather than guessing what they wanted."
                     ),
                 },
                 "vehicle": {
@@ -425,6 +451,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         # transcribes a phone number itself. Called before every booking.
         caller = normalize_phone(await get_verified_caller_number() or "")
         result["calling_number"] = f"{caller[:3]}-{caller[3:6]}-{caller[6:]}" if len(caller) == 10 else None
+        result["today"] = spoken_today()
         await params.result_callback(result)
 
     async def book_appointment(params: FunctionCallParams):
@@ -654,6 +681,22 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         observers=[LatencyLogObserver()],
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
+
+    # A turn VAD heard but STT turned into no text ends with nothing to
+    # send, so the LLM never runs and the caller hears silence - 56s of it
+    # on a real call (2026-10-21) where every unclear utterance was dropped
+    # this way. Feed it to the LLM as an explicit inaudible turn so the
+    # prompt's ask-once-then-transfer rule applies.
+    @user_aggregator.event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message):
+        if not (message.content or "").strip():
+            await worker.queue_frames(
+                [
+                    LLMMessagesAppendFrame(
+                        messages=[{"role": "user", "content": INAUDIBLE_MESSAGE}], run_llm=True
+                    )
+                ]
+            )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
