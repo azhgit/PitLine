@@ -1,168 +1,227 @@
 # PitLine
 
-An after-hours service-department line for a car dealership: an AI voice
-agent that answers real phone calls, classifies the problem, checks and
-books real appointments against a mock DMS, and simulates a handoff for
-anything safety-related — plus a live ops dashboard, together playing the
-role VaultDrive's own pitch describes: "the operational layer that sits
-above the DMS and runs the store instead of it."
+An after-hours service line for a car dealership: an AI voice agent that
+answers real phone calls, classifies the problem, checks and books real
+appointments against a mock dealer management system (DMS), and hands
+anything it shouldn't handle to a human with a summary and the caller's
+verification status. A live ops dashboard shows the schedule and every
+handoff as it happens.
 
-Built as a job-application demo. See [CONTEXT.md](CONTEXT.md) for the
-scenario and domain vocabulary, [doc/pitline-plan.md](doc/pitline-plan.md)
-for the execution plan this was built against, and
-[docs/adr/](docs/adr/) for the architecture decisions and why each one was
-made instead of the obvious alternative.
+It's a portfolio project, but it runs on a real phone number and has been
+tuned on real calls. Most of what's interesting here is **how the agent is
+tested, measured, and fixed**, more than the booking flow itself.
 
-## Why this exists
+- [CONTEXT.md](CONTEXT.md): the scenario and domain vocabulary
+- [docs/adr/](docs/adr/): architecture decisions, and why each beat the obvious alternative
+- [docs/jd-mapping.md](docs/jd-mapping.md): how this maps to a specific role's requirements
 
-VaultDrive's JD asks for full-stack ownership across a typed web stack,
-relational databases, background job/queue systems, and API design, with
-hands-on AI/LLM work as the mandatory core of the role — voice/telephony is
-a bonus, not the point. This adapts an earlier voice-pipeline-only demo
-(plumbing/HVAC dispatch) into something that actually exercises all of
-that: a real frontend, a real Postgres-backed queue, and a DMS that's a
-genuine service of its own, not a relabeled mock. The engineering bar
-throughout is **correctness, not cleverness** — fixed classification rules
-instead of model improvisation, decisions verified against the real API and
-real concurrent load instead of assumed, and every "why not the obvious
-alternative" question answered in writing rather than left implicit.
+## How the agent is evaluated
+
+Unit tests can't tell you whether an LLM agent will invent a callback
+promise or read a phone number back wrong. So the agent has three layers of
+checks, each catching a different class of failure.
+
+### 1. Simulated callers with a regression gate ([agent/simulate.py](agent/simulate.py))
+
+An LLM plays the caller. The agent runs on the **production** system prompt,
+tool schemas, model, and thinking setting, all imported from `bot.py`, so
+the suite can't drift from what's deployed. There are 11 scenarios, run 3
+times each:
+
+| Kind | Scenarios |
+|---|---|
+| Happy paths | oil change booked, urgent brakes booked with a Master Technician, verified cancel, caller wants a different callback number |
+| Unhappy paths | urgent with no slots → transfer, unintelligible twice → transfer, speech that never transcribes → transfer, DMS outage → no false confirmation, unverified cancel → transfer |
+| Hallucination traps | caller pushes for a time that was never offered; caller asks for a price the agent doesn't have |
+
+Tool results are scripted per scenario rather than coming from a live DMS.
+That's what lets the unhappy paths be forced on every run. The DMS itself is
+covered by its own 44 tests.
+
+Scoring is **code first, LLM judge only where code can't see**:
+
+- **Deterministic checks.** The call must end with the right tool and
+  transfer reason. Every booked slot must be one that `check_availability`
+  actually returned. No cancel may be attempted for an unverified caller.
+  Every booking must land on the expected phone number. Every transfer must
+  carry a handoff summary.
+- **LLM judge** (Sonnet 5.5, structured output). It sees the transcript, the
+  tool trace, and the agent's instructions. It answers two questions: was
+  the caller's problem handled, and did the agent state anything (aloud or
+  in the handoff summary) that no tool or instruction supported?
+
+**Gate:** zero safety failures, plus a ≥90% pass rate. Anything else exits
+non-zero. Every run reports containment, transfer rate, transfer
+correctness, hallucination rate, and time to first spoken token.
+
+### 2. Targeted evals
+
+- [eval_dispatch_classification.py](agent/eval_dispatch_classification.py)
+  checks urgent vs. non-urgent classification across the full category list.
+- [eval_edge_cases.py](agent/eval_edge_cases.py) covers single-turn edge
+  cases. It also runs on production's thinking setting.
+
+### 3. Real calls, read from production logs
+
+The simulator is text-only, so it can't see speech-to-text errors or
+turn-taking timing. Real calls are where those bugs appeared (see below).
+Each call was diagnosed from the Railway logs: per-turn latency, what STT
+actually heard, which turn-taking strategy fired.
+
+## What testing found and what changed
+
+Each row was found by the simulator or a real call, fixed, and re-verified.
+Where a prompt rule couldn't hold, the fix moved into code.
+
+| Found by | Problem | Fix |
+|---|---|---|
+| Simulator baseline | The agent said "tomorrow" for dates it couldn't place, invented callbacks, hours, and staff, and talked over its own transfer line | Prompt rules; then a model change (below) |
+| Simulator | With thinking off, the agent read 2030-06-18 back as "Thursday" | Code computes a `spoken` time for every slot, and the agent reads it verbatim |
+| Simulator | The agent echoed a caller's "tomorrow" despite a prompt rule against it | `check_availability` returns the dealership's `today`, so "tomorrow" is checkable |
+| Real call | 0.3–2.6 s of model "thinking" per turn on top of a ~0.6 s first byte | Thinking disabled. Simulator still 100% |
+| Real call | Heard "672 022 9889", booked "672-202-2989", and the caller said yes to the readback | Bookings default to the Twilio-verified calling number. Code formats it, and the model never transcribes digits |
+| Real call | Bookings made from a phone couldn't be found or cancelled from that same phone | Same fix: one source of truth for the caller's number |
+| Real call | Deepgram's last segment arrived ~30 ms after the turn ended. It was read as a new turn, cut off the reply, and lost the caller's vehicle details after 13 s of dead air | [turn_start.py](agent/turn_start.py) ignores transcripts within 1.5 s of the caller stopping |
+| Real call | VAD-only turn start missed a quiet "yes" (22 s of silence) | Same fix: transcripts can still start a turn outside that window |
+| Real call | Garbled speech produced **no** transcript, so the LLM never ran: 56 s of silence | Empty turns reach the LLM as an explicit `[inaudible]` message, so the rule "ask once, then transfer" applies |
+| Real call | On cancel calls the agent said "technician 2" | The DMS returns `technician_name` |
+
+### Choosing the model with the suite
+
+Prompt fixes on Haiku 4.5 plateaued: fixing one failure surfaced another.
+Same prompt, same scenarios, 27 runs each:
+
+| | Haiku 4.5 | Haiku 5.5 | Haiku 5.5, thinking off |
+|---|---|---|---|
+| Pass rate | 78% | 96% | 96% → 100% after the fixes above |
+| Hallucination rate | 19% | 0% | 4% → 0% |
+| Safety failures | 5 | 0 | 1 → 0 |
+| Time to first token, p50 / p95 (simulator) | 0.45 / 0.70 s | 0.63 / 1.43 s | 0.57 / 1.05 s |
+
+Haiku 5.5 is also a tenth of Haiku 4.5's price per token. The simulator
+under-predicted thinking time. Real calls showed it, and that's why thinking
+is off in production. After the change, real calls measured 0.46–0.81 s to
+the first spoken token on every turn.
+
+## Handoffs
+
+When the agent transfers a call, the advisor gets a structured record (see
+`transfer_and_end_call` in [bot.py](agent/bot.py)), split by who is allowed
+to write each part:
+
+- **Written by code, never the model:** the transfer reason, whether Caller
+  ID verification succeeded, and every tool call made during the call along
+  with its result.
+- **Written by the model, labelled as such:** a one- or two-sentence summary,
+  plus the vehicle and symptom *as the caller stated them*.
+
+Unverified callers are logged too, with no phone number and no SMS sent.
+That's the handoff an advisor most needs to see. The dashboard shows a
+verification badge, the caller-stated fields, the summary, and a "what the
+agent tried" list. The phone transfer itself is simulated: the agent speaks
+a fixed line and ends the call.
 
 ## Architecture
 
 ```
 Inbound call (Twilio Media Streams)
-  → agent/  (Pipecat pipeline: Deepgram STT → Claude tool-calling → ElevenLabs TTS)
+  → agent/  Pipecat pipeline: Deepgram STT → Claude Haiku 5.5 tool-calling → ElevenLabs TTS
       → reads/writes the DMS through its HTTP API only
   → back to Twilio
 
 agent/worker.py
-  → polls dms/ 's job queue (POST /jobs/claim), sends confirmation/handoff SMS via Twilio
+  → claims jobs from the DMS queue, sends confirmation/handoff SMS via Twilio
 
-dashboard/  (Next.js + TypeScript)
-  → subscribes to dms/ 's SSE feed, read-only live view of new appointments and handoffs
+dashboard/  Next.js + TypeScript
+  → read-only live view over the DMS's SSE feed
 
-dms/  (FastAPI + Postgres)
-  → Technician / Appointment / Handoff / Job tables
-  → the only thing that touches Postgres directly - agent, worker, and
-    dashboard all reach it through its API (see ADR-0001)
+dms/  FastAPI + Postgres
+  → technicians, appointments, handoffs, job queue
+  → the only service that touches Postgres (ADR-0001)
 ```
 
-Five services deployed independently on Railway: `agent`, `dms`, `worker`,
-`dashboard`, and a managed Postgres instance.
+There are five services on Railway: agent, dms, worker, dashboard, and
+Postgres.
 
-## How this maps to the JD
+Some engineering choices that hold up under load, not just in a demo:
 
-| JD requirement | Where | Evidence |
-|---|---|---|
-| Hands-on AI/LLM work shipped to real users (marked mandatory) | `agent/bot.py` | Real Claude tool-calling agent, deployed, taking real inbound Twilio calls, writing real bookings and sending real SMS |
-| Typed web stack, front and back | `dashboard/app/page.tsx`, `dms/*.py` | Next.js + TypeScript dashboard; FastAPI + Pydantic on the backend |
-| Relational databases | `dms/models.py` | Postgres with a partial unique index closing a real double-booking race (`uq_appointments_technician_slot_booked`), not just an app-level check |
-| Background job and queue systems | `dms/jobs.py`, `agent/worker.py` | Postgres-backed queue with `FOR UPDATE SKIP LOCKED` claim semantics - safe for multiple worker replicas, not a naive poll-and-patch |
-| API design | `dms/main.py`, `dms/*.py` | REST + SSE, API-key auth, rate limiting, CORS scoped to what the dashboard actually needs |
-| Cloud infrastructure | Railway (5 services) | Independent deploys, env-var-driven config, a real security fix shipped post-launch (see below) |
-| Voice, telephony, real-time streaming (strong asset) | `agent/*.py` | Hand-built Pipecat pipeline (not a managed voice platform), barge-in verified against real mid-sentence interruptions, latency measured per pipeline stage |
-| Automotive/DMS-adjacent systems (strong asset) | `CONTEXT.md`, `dms/models.py` | Quick Service / Master Technician routing asymmetry, vehicle make/model/year schema, dealership vocabulary enforced throughout |
-| Built something that had to be right (strong asset) | `docs/adr/`, `dms/appointments.py`, `agent/twilio_auth.py` | Race condition closed at the DB level and proven under real concurrent load; a Twilio webhook with zero signature verification found and fixed post-launch, not hypothetical |
+- A **partial unique index** on technician and slot closes a double-booking
+  race that an app-level check can't. It was proven with 10 concurrent
+  bookings against the live deployment.
+- A **Postgres job queue** uses `FOR UPDATE SKIP LOCKED`, so multiple worker
+  replicas never double-send. The SMS job is written in the same transaction
+  as the booking (ADR-0002).
+- **Caller identity comes from Twilio, never from the conversation.** Lookups
+  and cancels use the verified Caller ID. `cancel_appointment` re-checks
+  ownership in code, so the model can't be talked into cancelling someone
+  else's appointment.
+- **Twilio webhook signatures are verified**, and the media WebSocket is
+  token-gated.
+- **Dependencies are pinned** to the versions the tests ran against. An
+  unpinned redeploy once pulled a newer SQLAlchemy and took the DMS down
+  for about 5 minutes. That's how this rule got here.
 
 ## Repo layout
 
 ```
-agent/       Pipecat voice pipeline (bot.py), SMS worker (worker.py), evals
-dms/         FastAPI + Postgres mock DMS - appointments, technicians,
-             handoffs, job queue, SSE event feed
-dashboard/   Next.js + TypeScript Ops Dashboard
+agent/       Pipecat pipeline (bot.py), SMS worker, simulator, evals, turn-taking
+dms/         FastAPI + Postgres DMS: appointments, technicians, handoffs, job queue, SSE
+dashboard/   Next.js + TypeScript ops dashboard
 docs/adr/    Architecture decision records
-doc/         Original execution plan
 CONTEXT.md   Scenario and domain vocabulary
 ```
 
 ## Running it locally
 
-Each service needs its own `.env` / `.env.local` - see each directory's
-`requirements.txt` / `package.json` for dependencies.
+Each service needs its own `.env` / `.env.local`.
 
 ```bash
-# Postgres (or point DATABASE_URL at any Postgres instance)
+# Postgres
 docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=pitline -e POSTGRES_DB=pitline postgres:16-alpine
 
 # DMS
 cd dms && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python seed.py && uvicorn main:app --port 8001
+pytest                                   # 44 tests
 
 # Agent (separate terminal)
 cd agent && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python bot.py -t twilio --host 0.0.0.0 --port 7860 -x <your-ngrok-or-public-domain>
-
-# Worker (separate terminal)
-python worker.py
+python bot.py -t twilio --host 0.0.0.0 --port 7860 -x <your-public-domain>
+python simulate.py                       # regression gate; costs real API spend
+python worker.py                         # separate terminal
 
 # Dashboard (separate terminal)
 cd dashboard && npm install && npm run dev
 ```
 
-Point a Twilio phone number's Voice webhook at `https://<your-domain>/`
-(POST) to actually call it.
-
-## What's real vs. simulated
-
-Everything is real except the **Handoff simulation** itself (CONTEXT.md):
-when the agent decides a call needs a human - an Urgent case with no
-Master Technician available, or a caller it can't understand twice in a
-row - it speaks a fixed line and ends the call. No real transfer happens,
-by design; that's the one deliberately-scoped-out piece, not an
-accident. Everything upstream of that decision (classification, DMS
-queries, the actual hangup, the queued follow-up SMS) is real.
-
-## Verification
-
-- **42 pytest tests** (`dms/`) covering booking, availability routing,
-  rate limiting, the job queue, and the concurrency fixes below
-- **`agent/eval_dispatch_classification.py`** - the full CONTEXT.md
-  urgent/non-urgent category list, run against the real Anthropic API
-  (Haiku and Sonnet), 22/22
-- **`agent/eval_edge_cases.py`** - unintelligible-caller, no-availability,
-  DMS-outage, and booking-confirmation flows against the real API, 8/8
-- **`dms/loadtest_concurrency.py`** - fires genuine concurrent traffic at
-  a live DMS instance to prove two fixes actually hold, not just in
-  theory: 10 simultaneous bookings for the same slot (exactly one
-  succeeds), a booking burst past the rate limit (blocked at exactly the
-  right count), and 20 concurrent job-claim calls against 8 real jobs
-  (never double-claimed) - run against the real Railway deployment while
-  its own live worker was concurrently draining the same queue
-- **Real phone calls**, repeatedly, against the deployed Railway
-  services - not just local/ngrok - including one that caught a live bug
-  (a Twilio `<Stream>` URL quirk breaking the WebSocket auth token) within
-  the hour it shipped
-
-`agent/latency_chart.png` is generated from real call data by
-`agent/visualize_latency.py`, not synthetic numbers.
+Point a Twilio number's Voice webhook at `https://<your-domain>/` (POST) to
+call it.
 
 ## Known limitations
 
-Written down rather than glossed over:
-
-- **No multi-replica load-bearing test on Railway itself.** The fixes in
-  [ADR-0003](docs/adr/0003-horizontal-scaling-path.md) (Postgres
-  `LISTEN`/`NOTIFY` for the SSE feed, `FOR UPDATE SKIP LOCKED` job
-  claiming) are verified by actually running two local processes against
-  the same database, not by scaling the live Railway services past one
-  replica each (deliberately, to avoid the extra cost).
-- **No connection pooling (PgBouncer).** Not needed at this scale; noted
-  in ADR-0003 as the next thing to add if replica count grows.
-- **Single dealership, fixed seed data.** No multi-tenant DMS, no admin
-  UI for managing technicians/schedules - out of scope for a demo built
-  around one scenario.
-- **English only.** STT/TTS assume English; no language detection or
-  localization.
-- **The Twilio account required a paid upgrade mid-build** - trial
-  accounts can't programmatically end calls or send free-text SMS. Noted
-  here because it's a real operational constraint anyone extending this
-  would hit immediately, not a design choice.
+- **The simulator is text-only.** It can't catch speech-to-text errors or
+  turn-taking timing. Every bug in the "Real call" rows above was invisible
+  to it.
+- **Three runs per scenario is a coarse signal.** The same configuration
+  scored 70% and 85% on two consecutive runs. The suite catches big
+  regressions, not 5-point ones. The 0-safety-failure gate will sometimes
+  flag a rare failure that a rerun doesn't reproduce.
+- **The judge is a model too.** It needed calibration: it had to see the
+  tool descriptions, and it writes its reasoning before its verdict. An
+  early version marked correct weekdays as hallucinations.
+- **Evals share the live agent's API rate limit.** A back-to-back run once
+  hit 429s. A real setup would use a separate key or workspace.
+- **Quiet speech that VAD misses** gets a reply only after Pipecat's 5 s
+  turn timeout. That's better than the 22 s it was, but it isn't instant.
+- **The handoff is simulated.** There's no live transfer to a person.
+- **Schema changes are hand-written, idempotent `ALTER`s** at DMS startup.
+  They'll move to Alembic the next time a column changes.
+- Single dealership, fixed seed data, English only.
 
 ## Architecture decisions
 
-- [ADR-0001](docs/adr/0001-dms-ops-layer-mirrors-vaultdrive-architecture.md) - the DMS is a dumb system of record; PitLine is the ops layer above it
-- [ADR-0002](docs/adr/0002-postgres-queue-table-not-redis.md) - a Postgres queue table instead of Redis/Celery for the Follow-up job
-- [ADR-0003](docs/adr/0003-horizontal-scaling-path.md) - what scaling past one replica of each service actually requires, and why none of it needs a new paid service
+- [ADR-0001](docs/adr/0001-dms-ops-layer-mirrors-vaultdrive-architecture.md): the DMS is a dumb system of record, and PitLine is the ops layer above it
+- [ADR-0002](docs/adr/0002-postgres-queue-table-not-redis.md): a Postgres queue table instead of Redis/Celery
+- [ADR-0003](docs/adr/0003-horizontal-scaling-path.md): what scaling past one replica actually requires
