@@ -39,6 +39,7 @@ from caller_id import lookup_caller_number, normalize_phone
 from latency_observer import LatencyLogObserver
 from silence_timeout import SilenceTimeoutProcessor
 from thinking_filler import ThinkingFillerProcessor, ToolCallStartedFrame
+from turn_start import LateFinalTolerantTranscriptionStart
 
 load_dotenv(override=True)
 
@@ -555,16 +556,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=_vad_params_from_env()),
-            # VAD-only turn start - drops Pipecat's default
-            # TranscriptionUserTurnStartStrategy. On real calls (2026-10-21)
-            # Deepgram's last final landed ~30ms after smart-turn ended the
-            # turn; that strategy read it as a new turn, interrupted the
-            # in-flight reply, then timed out 5s later without inference -
-            # 13s of dead air and the caller's vehicle details lost. Late
-            # transcripts still land in the aggregation (see
-            # LLMUserAggregator._handle_transcription), so they ride along
-            # with the next turn instead. Stop strategy stays the default.
-            user_turn_strategies=UserTurnStrategies(start=[VADUserTurnStartStrategy()]),
+            # VAD start plus a transcription start that ignores the late
+            # final of the turn that just ended - see turn_start.py for the
+            # two real-call failures this balances. Stop strategy stays the
+            # default.
+            user_turn_strategies=UserTurnStrategies(
+                start=[VADUserTurnStartStrategy(), LateFinalTolerantTranscriptionStart()]
+            ),
         ),
     )
 
