@@ -1,14 +1,17 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg2-binary
-python-dotenv
-python-multipart
-sse-starlette
-asyncpg
-tzdata
+# Pinned to the versions the 42-test suite runs against - an unpinned
+# redeploy on 2026-10-21 pulled a newer SQLAlchemy that defaults
+# postgresql:// to psycopg 3 (not installed) and crashed on startup.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sqlalchemy==2.0.52
+psycopg2-binary==2.9.13
+python-dotenv==1.2.3
+python-multipart==0.0.32
+sse-starlette==3.4.11
+asyncpg==0.31.0
+tzdata==2026.4
 
 # test-only
-pytest
-httpx
-coverage
+pytest==9.1.1
+httpx==0.28.1
+coverage==7.16.0
