@@ -255,12 +255,15 @@ call it.
   or digits STT spelled out as words, stay in the transcript. The next step
   is NER or an LLM redaction pass. There's also no retention policy yet; a
   real deployment would purge transcripts after a fixed window.
-- **The dashboard's DMS key is public.** It's a `NEXT_PUBLIC_` variable, so
-  it ships in the browser bundle, and anything it can read is effectively
-  public. That's why transcripts sit behind a second key. The real fix is a
-  server-side proxy, so the browser never holds a DMS key at all.
-- **Schema changes are hand-written, idempotent `ALTER`s** at DMS startup.
-  They'll move to Alembic the next time a column changes.
+- **The dashboard's DMS key is public, but it's read-only.** It's a
+  `NEXT_PUBLIC_` variable, so it ships in the browser bundle. It used to be
+  the only DMS key, which meant anyone could take it from the page and
+  cancel appointments or claim SMS jobs. Now it accepts GET requests only.
+  Writes need a separate key, sent as a header and held only by the agent
+  and worker. The old key was rotated. Transcripts sit behind a third key.
+  Names and phone numbers in the schedule are still readable with the
+  public key. The full fix is a server-side proxy, so the browser holds no
+  DMS key at all.
 - Single dealership, fixed seed data, English only.
 
 ## Architecture decisions
