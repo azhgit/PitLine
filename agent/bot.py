@@ -140,10 +140,18 @@ SYSTEM_INSTRUCTION = (
     "   - slots empty (only possible for urgent - non_urgent always finds "
     "something): call transfer_and_end_call with reason "
     "'urgent_no_availability'.\n"
-    "3. Once the caller picks a slot, get their name, phone number, and "
-    "vehicle make/model/year, then read all of it back and get an explicit "
-    "yes before booking - STT can mishear a name, a digit, or a vehicle "
-    "detail and there'd be no other way to catch it. Only after they "
+    "3. Once the caller picks a slot, get their name and vehicle "
+    "make/model/year, and ask whether the number they're calling from is "
+    "the best one to reach them. For that number, leave customer_phone out "
+    "of book_appointment - it's filled in from the verified calling number, "
+    "so never ask them to say it. You never see the calling number's "
+    "digits, so never state or guess them. Only if they want a different number, "
+    "collect it and pass it as customer_phone. Read the name, vehicle, and "
+    "number back ('the number you're calling from', or the digits they "
+    "gave) and get an explicit yes before booking - STT can mishear a "
+    "name, a digit, or a vehicle detail and there'd be no other way to "
+    "catch it. If book_appointment returns error 'phone_needed', ask for "
+    "their number and call it again with customer_phone. Only after they "
     "confirm, call book_appointment with that exact slot, read back the "
     "confirmed time and technician name to close the call, then call "
     "end_call.\n"
@@ -220,7 +228,14 @@ def build_tool_schemas() -> list[FunctionSchema]:
                     ),
                 },
                 "customer_name": {"type": "string"},
-                "customer_phone": {"type": "string"},
+                "customer_phone": {
+                    "type": "string",
+                    "description": (
+                        "Only if the caller wants a number other than the one "
+                        "they're calling from - omit it to use the verified "
+                        "calling number."
+                    ),
+                },
                 "vehicle_make": {"type": "string"},
                 "vehicle_model": {"type": "string"},
                 "vehicle_year": {"type": "integer"},
@@ -233,7 +248,6 @@ def build_tool_schemas() -> list[FunctionSchema]:
                 "technician_id",
                 "time_slot",
                 "customer_name",
-                "customer_phone",
                 "vehicle_make",
                 "vehicle_model",
                 "vehicle_year",
@@ -336,7 +350,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     # Lazy, per-call cache for the Twilio-verified Caller ID - looked up at
-    # most once per call (only if find_appointment is actually invoked, not
+    # most once per call (only if a booking or lookup actually needs it, not
     # on every call) since it costs a Twilio REST round trip. A dict cell
     # rather than a bare variable so the closures below can both read and
     # write it without `nonlocal`.
@@ -375,6 +389,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def book_appointment(params: FunctionCallParams):
         await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
         args = params.arguments
+        # The verified calling number by default, not digits the LLM
+        # transcribed: a real call on 2026-10-21 heard "672 022 9889" and
+        # booked "672-202-2989" after a readback the caller said yes to.
+        phone = args.get("customer_phone") or await get_verified_caller_number()
+        if not phone:
+            await params.result_callback({"error": "phone_needed"})
+            return
         headers = {}
         if _reschedule_state["exempt_next_booking"]:
             headers["X-Skip-Rate-Limit"] = "true"
@@ -386,7 +407,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     "technician_id": args["technician_id"],
                     "time_slot": args["time_slot"],
                     "customer_name": args["customer_name"],
-                    "customer_phone": args["customer_phone"],
+                    "customer_phone": phone,
                     "vehicle_make": args["vehicle_make"],
                     "vehicle_model": args["vehicle_model"],
                     "vehicle_year": args["vehicle_year"],

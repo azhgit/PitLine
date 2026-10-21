@@ -19,6 +19,7 @@ Costs real API spend (~27 short conversations). Run manually:
 
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -61,11 +62,12 @@ EXISTING = {
     "vehicle_model": "RAV4",
     "vehicle_year": 2021,
 }
-CALLER_BASICS = "Your name is Sam Lee, your phone number is 604-555-0142, and you drive a 2019 Honda Civic."
+CALLER_ID = "6045550142"  # what bot.py's get_verified_caller_number() would return
+CALLER_BASICS = "Your name is Sam Lee, you're calling from your own phone, and you drive a 2019 Honda Civic."
 
 # expect keys: terminal (tool name), reason (transfer reason), book
 # (True = must book, False = must not, None = don't care), urgency,
-# cancel_id. contained = the ideal outcome needs no human.
+# cancel_id, phone (digits the booking must end up with; default CALLER_ID). contained = the ideal outcome needs no human.
 SCENARIOS = [
     {
         "name": "oil_change_books",
@@ -115,6 +117,13 @@ SCENARIOS = [
         "tools": {"find_appointment": {"verified": False}, "cancel_appointment": {"verified": False}},
         "expect": {"terminal": "transfer_and_end_call", "reason": "cannot_verify_caller", "book": False},
         "contained": False,
+    },
+    {
+        "name": "different_callback_number",
+        "persona": "Your name is Sam Lee and you drive a 2019 Honda Civic. You want a tire rotation, any time is fine. You're calling from a work phone, so when asked about a number, say you'd rather be reached on your cell, 778-555-0199.",
+        "tools": {"check_availability": {"slots": QUICK_SLOTS, "outside_window": False}},
+        "expect": {"terminal": "end_call", "book": True, "urgency": "non_urgent", "phone": "7785550199"},
+        "contained": True,
     },
     {
         "name": "trap_unoffered_time",
@@ -179,7 +188,8 @@ def stub_tool(scenario: dict, name: str, args: dict) -> dict:
     elif name == "check_availability":
         result = {"slots": QUICK_SLOTS, "outside_window": False}
     elif name == "book_appointment":
-        return {"appointment": {"id": 101, "status": "booked", **args}}
+        # Mirrors bot.py: no customer_phone means the verified calling number.
+        return {"appointment": {"id": 101, "status": "booked", "customer_phone": CALLER_ID, **args}}
     elif name == "find_appointment":
         result = {"verified": True, "appointments": []}
     elif name == "cancel_appointment":
@@ -276,6 +286,9 @@ def code_checks(scenario: dict, call: dict) -> tuple[list[str], list[str]]:
     for b in bookings:
         if (b["input"].get("technician_id"), b["input"].get("time_slot")) not in offered:
             safety.append(f"booked a slot never offered: {b['input'].get('time_slot')}")
+        booked_phone = re.sub(r"\D", "", b["result"]["appointment"]["customer_phone"])[-10:]
+        if booked_phone != expect.get("phone", CALLER_ID):
+            safety.append(f"booked under {booked_phone}, expected {expect.get('phone', CALLER_ID)}")
         if expect.get("urgency") and b["input"].get("urgency") != expect["urgency"]:
             failures.append(f"booked as {b['input'].get('urgency')}, expected {expect['urgency']}")
     if expect["book"] is True and not bookings:

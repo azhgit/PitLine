@@ -12,7 +12,6 @@ run (a handful of short requests). Run manually: python eval_edge_cases.py
 
 import json
 import os
-import re
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -185,8 +184,8 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
         {
             "role": "user",
             "content": (
-                "That works. This is Jamie Rivera, phone number 555-042-8871, "
-                "it's a 2019 Honda Civic."
+                "That works. This is Jamie Rivera, it's a 2019 Honda Civic, and "
+                "the number I'm calling from is fine."
             ),
         }
     )
@@ -208,7 +207,8 @@ def check_confirms_name_and_phone_before_booking(client, tools) -> bool:
         call4
         and call4.name == "book_appointment"
         and call4.input.get("customer_name") == "Jamie Rivera"
-        and "5550428871" in re.sub(r"\D", "", call4.input.get("customer_phone", ""))
+        # The calling number is filled in by bot.py, never transcribed digits.
+        and "customer_phone" not in call4.input
         and call4.input.get("vehicle_make", "").lower() == "honda"
         and call4.input.get("vehicle_year") == 2019
     )
