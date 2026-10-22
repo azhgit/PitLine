@@ -13,6 +13,7 @@ tested, measured, and fixed**, more than the booking flow itself.
 
 - [CONTEXT.md](CONTEXT.md): the scenario and domain vocabulary
 - [docs/adr/](docs/adr/): architecture decisions, and why each beat the obvious alternative
+- [docs/journeys/existing-appointment.md](docs/journeys/existing-appointment.md): the existing-appointment journey, written for ops and compliance
 
 ## How the agent is evaluated
 
@@ -355,3 +356,4 @@ call it.
 - [ADR-0001](docs/adr/0001-dms-ops-layer-mirrors-vaultdrive-architecture.md): the DMS is a dumb system of record, and PitLine is the ops layer above it
 - [ADR-0002](docs/adr/0002-postgres-queue-table-not-redis.md): a Postgres queue table instead of Redis/Celery
 - [ADR-0003](docs/adr/0003-horizontal-scaling-path.md): what scaling past one replica actually requires
+- [ADR-0004](docs/adr/0004-card-payments-leave-the-media-stream.md) (proposed): card payments leave the media stream for Twilio `<Pay>`, so no card digit reaches STT, the model, or logs
