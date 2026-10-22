@@ -181,6 +181,13 @@ SCENARIOS = [
     },
 ]
 
+# Scenarios made from real calls by call_to_scenario.py - reviewed by hand
+# before they're committed, then gated like the rest.
+REAL_CALL_SCENARIOS = os.path.join(os.path.dirname(__file__), "real_call_scenarios.json")
+if os.path.exists(REAL_CALL_SCENARIOS):
+    with open(REAL_CALL_SCENARIOS) as f:
+        SCENARIOS += json.load(f)
+
 CALLER_SYSTEM = (
     "You are role-playing a customer phoning a car dealership's after-hours "
     "service line, to test their phone agent. Stay in character. Reply with "
@@ -255,7 +262,7 @@ def stub_tool(scenario: dict, name: str, args: dict, trace: list) -> dict:
     add_spoken_times(result.get("slots", []) + result.get("appointments", []))
     if name == "check_availability" and "error" not in result:
         result["calling_number"] = f"{CALLER_ID[:3]}-{CALLER_ID[3:6]}-{CALLER_ID[6:]}"
-        result["today"] = "Monday, June 17"  # the stub slots fall on 2030-06-18, a Tuesday
+        result.setdefault("today", "Monday, June 17")  # the stub slots fall on 2030-06-18, a Tuesday
     return result
 
 

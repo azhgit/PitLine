@@ -55,7 +55,8 @@ def build_report(calls: list[dict], start: datetime, end: datetime) -> str:
     lines = [f"# Call review, {start:%Y-%m-%d} to {end:%Y-%m-%d}", "", f"{len(calls)} calls.", ""]
     lines += table("By journey", by_journey)
     lines += table("By prompt version", by_version)
-    lines += ["## Fix list", "", "Hallucinations first, then the biggest groups. The reason is the judge's; read the call before changing anything.", ""]
+    lines += ["## Fix list", "", "Hallucinations first, then the biggest groups. The reason is the judge's; read the call before changing anything. "
+              "Lock a fix in with `python call_to_scenario.py <id>`.", ""]
     ranked = sorted(fixes.items(), key=lambda kv: (kv[0][1] != "hallucinated", -len(kv[1])))
     for i, ((journey, why), group) in enumerate(ranked, 1):
         lines.append(f"### {i}. {journey}: {why} ({len(group)})")

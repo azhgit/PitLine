@@ -90,6 +90,17 @@ flagged, grouped by journey and failure, with hallucinations first and then
 the biggest groups. Each entry carries the judge's reason and the call id
 to read before changing anything.
 
+[call_to_scenario.py](agent/call_to_scenario.py) closes the loop. It turns
+a call from the fix list into a simulator scenario. The call's own tool
+results, stripped of names and numbers, become the scripted ones. A model
+drafts the caller persona and the outcome an agent following its
+instructions **should** have reached, so the scenario fails until the fix
+is in. Scenarios land in `real_call_scenarios.json`, and `simulate.py` gates
+them with the rest. The draft is reviewed by hand before it's committed. A
+call that never got past a step it should have passed, such as a transfer
+in place of step-up, has no recorded result for that step, so a person adds
+one.
+
 Transcripts are stored with the booked name and every phone number
 redacted, and they can be read only with a separate `REVIEW_API_KEY`. The
 dashboard's key can see aggregate stats only (see limitations).
