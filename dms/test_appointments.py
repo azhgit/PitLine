@@ -83,7 +83,26 @@ def test_create_appointment_enqueues_confirmation_sms_job(client, technicians):
     assert jobs[0]["job_type"] == "confirmation_sms"
     assert jobs[0]["payload"]["to"] == "555-0101"
     assert "Mike Alvarez" in jobs[0]["payload"]["body"]
+    assert jobs[0]["payload"]["body"].endswith("Reply STOP to opt out.")
     assert appointment_id  # sanity: booking itself still succeeded
+
+
+def test_declined_text_books_without_queuing_sms(client, technicians):
+    resp = client.post(
+        "/appointments",
+        json={
+            "technician_id": technicians["mike"],
+            "time_slot": future_slot(),
+            "customer_name": "Carla",
+            "customer_phone": "555-0101",
+            "vehicle_make": "Honda",
+            "vehicle_model": "Civic",
+            "vehicle_year": 2020,
+            "sms_consent": False,
+        },
+    )
+    assert resp.status_code == 200
+    assert client.get("/jobs", params={"status": "pending"}).json() == []
 
 
 def test_unknown_technician_rejected(client, technicians):

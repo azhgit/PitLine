@@ -50,7 +50,7 @@ async def create_handoff(payload: HandoffCreate, db: Session = Depends(get_db)):
                     "to": payload.customer_phone,
                     "body": (
                         "Thanks for calling - our on-call service advisor will be "
-                        "reaching out to you shortly."
+                        "reaching out to you shortly. Reply STOP to opt out."
                     ),
                 },
             )

@@ -24,13 +24,14 @@ checks, each catching a different class of failure.
 
 An LLM plays the caller. The agent runs on the **production** system prompt,
 tool schemas, model, and thinking setting, all imported from `bot.py`, so
-the suite can't drift from what's deployed. There are 13 scenarios, run 3
+the suite can't drift from what's deployed. There are 14 scenarios, run 3
 times each:
 
 | Kind | Scenarios |
 |---|---|
 | Happy paths | oil change booked, urgent brakes booked with a Master Technician, verified cancel, cancel from another phone via SMS step-up, caller wants a different callback number |
 | Unhappy paths | urgent with no slots → transfer, unintelligible twice → transfer, speech that never transcribes → transfer, DMS outage → no false confirmation, unverified cancel with no way to get a text → transfer, wrong step-up code twice → transfer |
+| Compliance | caller declines a text confirmation → booked with no text |
 | Hallucination traps | caller pushes for a time that was never offered; caller asks for a price the agent doesn't have |
 
 Tool results are scripted per scenario rather than coming from a live DMS.
@@ -42,7 +43,8 @@ Scoring is **code first, LLM judge only where code can't see**:
 - **Deterministic checks.** The call must end with the right tool and
   transfer reason. Every booked slot must be one that `check_availability`
   actually returned. No cancel may be attempted for an unverified caller
-  who hasn't passed step-up, or for an appointment no lookup returned.
+  who hasn't passed step-up, or for an appointment no lookup returned. A
+  booking may not send a text the caller declined.
   Every booking must land on the expected phone number. Every transfer must
   carry a handoff summary.
 - **LLM judge** (Sonnet 5.5, structured output). It sees the transcript, the
@@ -160,6 +162,24 @@ Prompt changes roll out in stages rather than all at once (see
 5. Promote the candidate to `stable`. To roll back at any step, set
    `CANDIDATE_PERCENT=0`. That's an environment variable change, not a code
    deploy.
+
+## Compliance language and consent
+
+Anything that has to be said word for word is spoken by code, never
+generated. The greeting discloses that the caller is talking to an
+automated assistant and that the call may be recorded. Because nothing
+would notice if that code path broke, `weekly_review.py` checks every real
+call's first line against the exact text and puts any mismatch at the top
+of the fix list.
+
+Texts need a yes. Before booking, the candidate prompt asks whether it's OK
+to text a confirmation, and `book_appointment` carries the answer as
+`sms_consent`. On `false`, the DMS books without queuing the text, and that
+rule lives in code. The yes or no stays on record in the call's tool log.
+Every text ends with "Reply STOP to opt out." The handoff text after a
+transfer doesn't ask first: a transfer usually comes before the booking
+step, and adding a question in front of it would make the caller wait.
+This is consent engineering for a demo, not legal advice on TCPA.
 
 ## Verification tiers
 

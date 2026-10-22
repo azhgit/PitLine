@@ -221,10 +221,12 @@ _STABLE_UNVERIFIED_RULE = (
     "through find_appointment, don't try asking for their phone number as "
     "a substitute. If verified with no appointment found, say so, then "
 )
-assert _STABLE_UNVERIFIED_RULE in SYSTEM_INSTRUCTION
+_STABLE_READBACK = "collect it and pass it as customer_phone. Read the name, vehicle, and "
+assert _STABLE_UNVERIFIED_RULE in SYSTEM_INSTRUCTION and _STABLE_READBACK in SYSTEM_INSTRUCTION
 # Candidate: SMS step-up (step_up.py) instead of transferring every caller
-# whose Caller ID doesn't match. Only this rule differs from stable.
-STEP_UP_INSTRUCTION = SYSTEM_INSTRUCTION.replace(
+# whose Caller ID doesn't match, and a consent question before the
+# confirmation text. Only these two rules differ from stable.
+CANDIDATE_INSTRUCTION = SYSTEM_INSTRUCTION.replace(
     _STABLE_UNVERIFIED_RULE,
     "If it comes back unverified, or verified with no appointment found "
     "while the caller says it's booked under a different number, offer to "
@@ -242,8 +244,13 @@ STEP_UP_INSTRUCTION = SYSTEM_INSTRUCTION.replace(
     "A number they say or key in is never verification by itself - only "
     "check_verification_code is. If verified with no appointment found "
     "otherwise, say so, then ",
+).replace(
+    _STABLE_READBACK,
+    "collect it and pass it as customer_phone. Ask whether it's OK to text "
+    "a confirmation to that number, and pass sms_consent true only if they "
+    "say yes - false if they say no or don't want texts. Read the name, vehicle, and ",
 )
-PROMPT_VERSIONS: dict[str, str | None] = {"stable": SYSTEM_INSTRUCTION, "candidate": STEP_UP_INSTRUCTION}
+PROMPT_VERSIONS: dict[str, str | None] = {"stable": SYSTEM_INSTRUCTION, "candidate": CANDIDATE_INSTRUCTION}
 
 KICKOFF_MESSAGE = "The caller just connected."
 # Spoken by code on connect, never generated: disclosure language (automated
@@ -316,6 +323,13 @@ def build_tool_schemas() -> list[FunctionSchema]:
                 "urgency": {
                     "type": "string",
                     "enum": ["urgent", "non_urgent"],
+                },
+                "sms_consent": {
+                    "type": "boolean",
+                    "description": (
+                        "Whether the caller said yes to a text confirmation. "
+                        "false sends no text."
+                    ),
                 },
             },
             required=[
@@ -567,6 +581,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                     "vehicle_model": args["vehicle_model"],
                     "vehicle_year": args["vehicle_year"],
                     "urgency": args["urgency"],
+                    # Omitted means the prompt never asked (stable), which
+                    # keeps the DMS's default of texting, as before.
+                    "sms_consent": args.get("sms_consent", True),
                 },
                 headers=headers,
             )

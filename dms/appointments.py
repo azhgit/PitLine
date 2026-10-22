@@ -39,6 +39,10 @@ class AppointmentCreate(BaseModel):
     vehicle_model: str
     vehicle_year: int
     urgency: str = "non_urgent"
+    # Whether the caller said yes to a text confirmation. Defaults true so
+    # callers that predate the consent question keep today's behaviour; the
+    # record of the yes or no is the agent's call tool log.
+    sms_consent: bool = True
 
 
 def _serialize(a: Appointment) -> dict:
@@ -127,22 +131,24 @@ async def create_appointment(
         raise HTTPException(
             status_code=409, detail="Technician is already booked for that time slot"
         )
-    appointment = Appointment(**payload.model_dump())
+    appointment = Appointment(**payload.model_dump(exclude={"sms_consent"}))
     db.add(appointment)
-    # Same transaction as the Appointment write (ADR-0002) - a booking can
-    # never exist without its confirmation SMS being queued.
-    db.add(
-        Job(
-            job_type="confirmation_sms",
-            payload={
-                "to": appointment.customer_phone,
-                "body": (
-                    f"Your appointment with {technician.name} is confirmed for "
-                    f"{appointment.time_slot.strftime('%A, %B %d at %-I:%M %p')}. See you then!"
-                ),
-            },
+    # Same transaction as the Appointment write (ADR-0002) - a booking the
+    # caller agreed to a text for can never exist without it being queued.
+    if payload.sms_consent:
+        db.add(
+            Job(
+                job_type="confirmation_sms",
+                payload={
+                    "to": appointment.customer_phone,
+                    "body": (
+                        f"Your appointment with {technician.name} is confirmed for "
+                        f"{appointment.time_slot.strftime('%A, %B %d at %-I:%M %p')}. See you then! "
+                        "Reply STOP to opt out."
+                    ),
+                },
+            )
         )
-    )
     try:
         db.commit()
     except IntegrityError:

@@ -15,6 +15,8 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from bot import GREETING
+
 CONTAINED = {"booked", "cancelled", "resolved_no_action"}  # same as dms/calls.py
 
 
@@ -23,10 +25,15 @@ def pct(n: int, d: int) -> str:
 
 
 def failure(call: dict) -> str | None:
-    """Why this call belongs on the fix list, or None. Hallucination outranks
-    everything; then a judge overturning a contained call; then whatever
-    kept it from being contained."""
+    """Why this call belongs on the fix list, or None. Compliance and
+    hallucination outrank everything; then a judge overturning a contained
+    call; then whatever kept it from being contained."""
     review = call["review"] or {}
+    # The disclosure is spoken by code, so this only fires if that path
+    # breaks - which is exactly when nobody would otherwise notice.
+    agent_lines = [line["text"] for line in call.get("transcript") or [] if line["role"] == "agent"]
+    if agent_lines and agent_lines[0] != GREETING:
+        return "disclosure not verbatim"
     if review.get("hallucinated"):
         return "hallucinated"
     if call["outcome"] in CONTAINED:
@@ -55,9 +62,10 @@ def build_report(calls: list[dict], start: datetime, end: datetime) -> str:
     lines = [f"# Call review, {start:%Y-%m-%d} to {end:%Y-%m-%d}", "", f"{len(calls)} calls.", ""]
     lines += table("By journey", by_journey)
     lines += table("By prompt version", by_version)
-    lines += ["## Fix list", "", "Hallucinations first, then the biggest groups. The reason is the judge's; read the call before changing anything. "
+    lines += ["## Fix list", "", "Compliance and hallucinations first, then the biggest groups. The reason is the judge's; read the call before changing anything. "
               "Lock a fix in with `python call_to_scenario.py <id>`.", ""]
-    ranked = sorted(fixes.items(), key=lambda kv: (kv[0][1] != "hallucinated", -len(kv[1])))
+    first = ["disclosure not verbatim", "hallucinated"]
+    ranked = sorted(fixes.items(), key=lambda kv: (first.index(kv[0][1]) if kv[0][1] in first else len(first), -len(kv[1])))
     for i, ((journey, why), group) in enumerate(ranked, 1):
         lines.append(f"### {i}. {journey}: {why} ({len(group)})")
         for c in group:
@@ -96,13 +104,16 @@ def _check():
         call(3, "existing_appointment", "transferred", "cannot_verify_caller", version="candidate"),
         call(4, "new_booking", "booked", review={"resolved": True, "hallucinated": True, "reason": "said $90"}),
         call(5, "other", "resolved_no_action", review={"resolved": False, "hallucinated": False, "reason": "hung up on them"}),
+        {**call(6, "new_booking", "booked", review=ok), "transcript": [{"role": "agent", "text": "Hi, how can I help?"}]},
+        {**call(7, "new_booking", "booked", review=ok), "transcript": [{"role": "agent", "text": GREETING}, {"role": "agent", "text": "Sure."}]},
     ]
-    assert [failure(c) for c in calls] == [None, "transferred: cannot_verify_caller", "transferred: cannot_verify_caller", "hallucinated", "judged unresolved"]
+    assert [failure(c) for c in calls] == [None, "transferred: cannot_verify_caller", "transferred: cannot_verify_caller", "hallucinated", "judged unresolved", "disclosure not verbatim", None]
     report = build_report(calls, datetime(2026, 10, 14), datetime(2026, 10, 21))
-    assert "| new_booking | 2 | 100% | 100% | 2 |" in report
+    assert "| new_booking | 4 | 100% | 100% | 4 |" in report
     assert "| candidate | 1 | 0% | - | 0 |" in report
     # Hallucination ranks first even with one call; then the biggest group.
-    assert report.index("### 1. new_booking: hallucinated (1)") < report.index("### 2. existing_appointment: transferred: cannot_verify_caller (2)")
+    assert report.index("### 1. new_booking: disclosure not verbatim (1)") < report.index("### 2. new_booking: hallucinated (1)")
+    assert report.index("### 2. new_booking: hallucinated (1)") < report.index("### 3. existing_appointment: transferred: cannot_verify_caller (2)")
     assert "- #3 (candidate): not reviewed yet" in report
     assert "#1 " not in report  # contained and judged fine: not on the fix list
     print("ok")
