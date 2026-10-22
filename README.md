@@ -24,13 +24,13 @@ checks, each catching a different class of failure.
 
 An LLM plays the caller. The agent runs on the **production** system prompt,
 tool schemas, model, and thinking setting, all imported from `bot.py`, so
-the suite can't drift from what's deployed. There are 11 scenarios, run 3
+the suite can't drift from what's deployed. There are 13 scenarios, run 3
 times each:
 
 | Kind | Scenarios |
 |---|---|
-| Happy paths | oil change booked, urgent brakes booked with a Master Technician, verified cancel, caller wants a different callback number |
-| Unhappy paths | urgent with no slots → transfer, unintelligible twice → transfer, speech that never transcribes → transfer, DMS outage → no false confirmation, unverified cancel → transfer |
+| Happy paths | oil change booked, urgent brakes booked with a Master Technician, verified cancel, cancel from another phone via SMS step-up, caller wants a different callback number |
+| Unhappy paths | urgent with no slots → transfer, unintelligible twice → transfer, speech that never transcribes → transfer, DMS outage → no false confirmation, unverified cancel with no way to get a text → transfer, wrong step-up code twice → transfer |
 | Hallucination traps | caller pushes for a time that was never offered; caller asks for a price the agent doesn't have |
 
 Tool results are scripted per scenario rather than coming from a live DMS.
@@ -41,7 +41,8 @@ Scoring is **code first, LLM judge only where code can't see**:
 
 - **Deterministic checks.** The call must end with the right tool and
   transfer reason. Every booked slot must be one that `check_availability`
-  actually returned. No cancel may be attempted for an unverified caller.
+  actually returned. No cancel may be attempted for an unverified caller
+  who hasn't passed step-up, or for an appointment no lookup returned.
   Every booking must land on the expected phone number. Every transfer must
   carry a handoff summary.
 - **LLM judge** (Sonnet 5.5, structured output). It sees the transcript, the
@@ -137,14 +138,48 @@ Prompt changes roll out in stages rather than all at once (see
    `CANDIDATE_PERCENT=0`. That's an environment variable change, not a code
    deploy.
 
+## Verification tiers
+
+Who the caller is decides what the agent may do. Each tier is enforced in
+code, not by the prompt:
+
+| Tier | How | Unlocks |
+|---|---|---|
+| 0 | None | New bookings, general questions |
+| 1 | Twilio Caller ID matches the appointment | Look up, reschedule, cancel |
+| 2 | SMS step-up via Twilio Verify ([step_up.py](agent/step_up.py)) | The same, for a caller on another phone or with a withheld number |
+
+Step-up exists because "calling from my work phone" used to be an automatic
+transfer. Now the agent asks the caller to **key in** the number the
+appointment is under. A real call had already shown that STT can't be
+trusted with digits, so the number and the code both come in over DTMF. The
+agent texts a code to that number, and a passed check makes that number the
+call's verified identity. Lookups, cancel's ownership check, and a
+reschedule's rebook all follow it, with no second ownership path.
+
+- **Limits live in code:** at most 2 codes sent and 2 wrong codes per call,
+  then a `verification_failed` transfer. Codes go only to dialable US/Canada
+  numbers, which keeps premium international numbers (the SMS-pumping
+  target) out.
+- **No DMS lookup before sending.** Whether a number has an appointment is
+  revealed only after the caller proves they hold that phone. Twilio owns
+  the code, its expiry, and its attempt limits, so nothing is stored here.
+- **Not done:** step-up when Caller ID already matches. The code would go to
+  the same phone a spoofer is spoofing, so it would add friction without
+  adding proof.
+
+Step-up ships as the `candidate` prompt (only the unverified-caller rule
+differs) through the staged rollout below. Until it's promoted, the
+`stepup_*` scenarios pass only with `SIM_PROMPT_VERSION=candidate`.
+
 ## Handoffs
 
 When the agent transfers a call, the advisor gets a structured record (see
 `transfer_and_end_call` in [bot.py](agent/bot.py)), split by who is allowed
 to write each part:
 
-- **Written by code, never the model:** the transfer reason, whether Caller
-  ID verification succeeded, and every tool call made during the call along
+- **Written by code, never the model:** the transfer reason, whether the
+  caller was verified and how (Caller ID or SMS code), and every tool call made during the call along
   with its result.
 - **Written by the model, labelled as such:** a one- or two-sentence summary,
   plus the vehicle and symptom *as the caller stated them*.
@@ -249,6 +284,12 @@ call it.
   hit 429s. A real setup would use a separate key or workspace.
 - **Quiet speech that VAD misses** gets a reply only after Pipecat's 5 s
   turn timeout. That's better than the 22 s it was, but it isn't instant.
+- **Step-up is only partly covered.** The simulator types `DTMF: ...` as
+  text, so keypad timing and the real Verify API are tested only on real
+  calls. A keypad-only turn has no speech for smart-turn to end, so the
+  worst case is Pipecat's 5 s turn timeout. The code the caller keys in also
+  stays in the transcript. It's single-use and expires, but it isn't
+  redacted.
 - **The handoff is simulated.** There's no live transfer to a person.
 - **Transcript redaction only covers what a tool saw.** The booked name and
   the phone numbers are redacted. A name the caller gave before a transfer,

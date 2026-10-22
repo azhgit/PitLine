@@ -15,4 +15,8 @@ TRANSFER_MESSAGES = {
         "I'm not able to verify this call to make changes to an existing "
         "appointment - connecting you to our on-call service advisor now."
     ),
+    "verification_failed": (
+        "That code didn't match, so I can't make changes to this "
+        "appointment - connecting you to our on-call service advisor now."
+    ),
 }

@@ -117,6 +117,7 @@ const REASON_LABELS: Record<string, string> = {
   urgent_no_availability: "No Master Technician available",
   cannot_understand_caller: "Could not understand caller",
   cannot_verify_caller: "Could not verify caller",
+  verification_failed: "Wrong verification code",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -584,10 +585,12 @@ function HandoffSummary({ handoff }: { handoff: Handoff }) {
       <SummaryRow label="Reason" value={REASON_LABELS[handoff.reason] ?? handoff.reason} />
       {s && (
         <SummaryRow
-          label="Caller ID"
+          label="Identity"
           value={
             s.verification.caller_id_verified ? (
-              <span className="rounded bg-emerald-900/60 px-2 py-0.5 text-xs text-emerald-300">Verified</span>
+              <span className="rounded bg-emerald-900/60 px-2 py-0.5 text-xs text-emerald-300">
+                {s.verification.method === "sms_otp" ? "Verified by text code" : "Verified by Caller ID"}
+              </span>
             ) : (
               <span className="rounded bg-amber-900/60 px-2 py-0.5 text-xs text-amber-300">Not verified</span>
             )

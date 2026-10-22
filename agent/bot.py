@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.processors.aggregators.dtmf_aggregator import DTMFAggregator
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -41,6 +43,7 @@ from caller_id import lookup_caller_number, normalize_phone
 from latency_observer import LatencyLogObserver
 from rollout import pick_version
 from silence_timeout import SilenceTimeoutProcessor
+from step_up import StepUp, check_code, send_code
 from thinking_filler import ThinkingFillerProcessor, ToolCallStartedFrame
 from turn_start import LateFinalTolerantTranscriptionStart
 
@@ -212,7 +215,35 @@ INAUDIBLE_MESSAGE = "[inaudible: the caller spoke but nothing could be transcrib
 # 50 -> 100) while comparing prompt_version in the logs and handoffs;
 # finally promote it to "stable" and clear "candidate". Rollback is
 # CANDIDATE_PERCENT=0 - no deploy of code.
-PROMPT_VERSIONS: dict[str, str | None] = {"stable": SYSTEM_INSTRUCTION, "candidate": None}
+_STABLE_UNVERIFIED_RULE = (
+    "If it comes back unverified, call transfer_and_end_call with "
+    "reason 'cannot_verify_caller' right away - verification only works "
+    "through find_appointment, don't try asking for their phone number as "
+    "a substitute. If verified with no appointment found, say so, then "
+)
+assert _STABLE_UNVERIFIED_RULE in SYSTEM_INSTRUCTION
+# Candidate: SMS step-up (step_up.py) instead of transferring every caller
+# whose Caller ID doesn't match. Only this rule differs from stable.
+STEP_UP_INSTRUCTION = SYSTEM_INSTRUCTION.replace(
+    _STABLE_UNVERIFIED_RULE,
+    "If it comes back unverified, or verified with no appointment found "
+    "while the caller says it's booked under a different number, offer to "
+    "text a code to the number the appointment is under. Ask them to key "
+    "that number in on their phone's keypad and press pound - keyed digits "
+    "reach you as 'DTMF: ...'; never take the number spoken. Pass those "
+    "digits to send_verification_code. Once it's sent, ask them to key in "
+    "the code from the text the same way and pass it to "
+    "check_verification_code. If it returns verified true, call "
+    "find_appointment again and carry on below. If verified false with "
+    "attempts_left above 0, ask them to key it in once more; at 0, call "
+    "transfer_and_end_call with reason 'verification_failed'. If they "
+    "can't or won't get the text, or either verification tool returns an "
+    "error, call transfer_and_end_call with reason 'cannot_verify_caller'. "
+    "A number they say or key in is never verification by itself - only "
+    "check_verification_code is. If verified with no appointment found "
+    "otherwise, say so, then ",
+)
+PROMPT_VERSIONS: dict[str, str | None] = {"stable": SYSTEM_INSTRUCTION, "candidate": STEP_UP_INSTRUCTION}
 
 KICKOFF_MESSAGE = "The caller just connected."
 # Spoken by code on connect, never generated: disclosure language (automated
@@ -325,6 +356,36 @@ def build_tool_schemas() -> list[FunctionSchema]:
             required=["appointment_id"],
         ),
         FunctionSchema(
+            name="send_verification_code",
+            description=(
+                "Text a one-time code to the number the caller's appointment "
+                "is under, when find_appointment couldn't match their calling "
+                "number. Only with digits they keyed in."
+            ),
+            properties={
+                "customer_phone": {
+                    "type": "string",
+                    "description": "The digits from the caller's 'DTMF: ...' entry, exactly as keyed.",
+                },
+            },
+            required=["customer_phone"],
+        ),
+        FunctionSchema(
+            name="check_verification_code",
+            description=(
+                "Check the code the caller keyed in from the text. On "
+                "verified true, find_appointment and cancel_appointment work "
+                "for the number the code was sent to."
+            ),
+            properties={
+                "code": {
+                    "type": "string",
+                    "description": "The digits from the caller's 'DTMF: ...' entry, exactly as keyed.",
+                },
+            },
+            required=["code"],
+        ),
+        FunctionSchema(
             name="transfer_and_end_call",
             description=(
                 "Speak a fixed line for the given reason, then end the call - "
@@ -432,6 +493,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Every tool result this call, recorded by code (see logged() below) so
     # a handoff's record of what was tried never depends on the LLM.
     _tool_log: list[dict] = []
+    _step_up = StepUp()
 
     def logged(name, handler):
         async def wrapper(params: FunctionCallParams):
@@ -447,6 +509,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         return wrapper
 
     async def get_verified_caller_number() -> str | None:
+        # A passed step-up replaces Caller ID for the rest of the call, so
+        # lookups, cancel's ownership check, and a reschedule's rebook all
+        # follow the phone the code proved - no second ownership path.
+        if _step_up.verified_phone:
+            return _step_up.verified_phone
         if "value" not in _caller_number_cache:
             _caller_number_cache["value"] = await lookup_caller_number(call_sid)
         return _caller_number_cache["value"]
@@ -568,6 +635,27 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         _reschedule_state["exempt_next_booking"] = True
         await params.result_callback({"cancelled": True})
 
+    async def send_verification_code(params: FunctionCallParams):
+        await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
+        phone = params.arguments["customer_phone"]
+        if error := _step_up.send_error(phone):
+            await params.result_callback({"error": error})
+            return
+        digits = normalize_phone(phone)
+        if not await send_code(digits):
+            await params.result_callback({"error": "sms_unavailable"})
+            return
+        _step_up.record_send(digits)
+        await params.result_callback({"sent": True})
+
+    async def check_verification_code(params: FunctionCallParams):
+        await llm.push_frame(ToolCallStartedFrame(), FrameDirection.DOWNSTREAM)
+        if error := _step_up.check_error():
+            await params.result_callback({"error": error})
+            return
+        approved = await check_code(_step_up.phone, re.sub(r"\D", "", params.arguments["code"]))
+        await params.result_callback(_step_up.record_check(approved))
+
     async def transfer_and_end_call(params: FunctionCallParams):
         # Speaks the transfer line and ends the call directly, rather than
         # letting the LLM narrate its own transfer message and hoping to
@@ -590,7 +678,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         summary = {
             "summary": args.get("summary"),
             "caller_stated": {"vehicle": args.get("vehicle"), "symptom": args.get("symptom")},
-            "verification": {"caller_id_verified": bool(caller_number), "method": "twilio_caller_id"},
+            "verification": {
+                "caller_id_verified": bool(caller_number),
+                "method": "sms_otp" if _step_up.verified_phone else "twilio_caller_id",
+            },
             "tool_results": _tool_log,
             "prompt_version": prompt_version,
         }
@@ -622,6 +713,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm.register_function("book_appointment", logged("book_appointment", book_appointment))
     llm.register_function("find_appointment", logged("find_appointment", find_appointment))
     llm.register_function("cancel_appointment", logged("cancel_appointment", cancel_appointment))
+    llm.register_function("send_verification_code", logged("send_verification_code", send_verification_code))
+    llm.register_function("check_verification_code", logged("check_verification_code", check_verification_code))
     llm.register_function("transfer_and_end_call", logged("transfer_and_end_call", transfer_and_end_call))
     llm.register_function("end_call", logged("end_call", end_call))
 
@@ -658,6 +751,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         [
             transport.input(),
             stt,
+            # Keypad entry for step-up, so phone numbers and codes never go
+            # through STT. Emits "DTMF: <digits>" as a transcript on # or
+            # after the idle timeout.
+            # ponytail: 3s idle is a guess at how long callers pause mid-number;
+            # tune from real calls. A DTMF-only turn has no speech for
+            # smart-turn to end, so the worst case is the 5s user_turn_stop_timeout.
+            DTMFAggregator(timeout=3.0),
             user_aggregator,  # emits UserStartedSpeakingFrame - must come before the watcher below
             # Must come before llm/tts: its check-in/goodbye TTSSpeakFrame and
             # EndFrame are pushed downstream and need to pass through both to
