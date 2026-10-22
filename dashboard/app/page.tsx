@@ -39,13 +39,24 @@ const UNVERIFIED_CALLER = "Unverified caller";
 
 // Aggregates only (dms/calls.py stats) - transcripts need a separate key
 // this page never has.
-type CallStats = {
+type Rates = {
   total: number;
-  by_outcome: Record<string, number>;
   containment_by_rule: number | null;
   containment_judged: number | null;
   hallucination_rate: number | null;
   reviewed: number;
+};
+
+type CallStats = Rates & {
+  by_outcome: Record<string, number>;
+  // Decided by the DMS from each call's tool log (dms/calls.py journey()).
+  by_journey?: Record<string, Rates>;
+};
+
+const JOURNEY_LABELS: Record<string, string> = {
+  new_booking: "New booking",
+  existing_appointment: "Existing appointment",
+  other: "Other",
 };
 
 // Calls are written when they end and don't come over SSE, so stats poll.
@@ -349,6 +360,28 @@ function CallStatsPanel({ stats }: { stats: CallStats }) {
         <StatTile label="Transferred" value={String(count("transferred"))} />
         <StatTile label="Caller hung up" value={String(count("abandoned"))} />
       </div>
+      {stats.by_journey && Object.keys(stats.by_journey).length > 0 && (
+        <table className="mt-3 w-full text-sm tabular-nums">
+          <thead className="text-xs uppercase tracking-wide text-neutral-500">
+            <tr>
+              <th className="py-1 text-left font-normal">Journey</th>
+              <th className="py-1 text-right font-normal">Calls</th>
+              <th className="py-1 text-right font-normal">Contained</th>
+              <th className="py-1 text-right font-normal">Judged</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(stats.by_journey).map(([journey, r]) => (
+              <tr key={journey} className="border-t border-neutral-800">
+                <td className="py-1.5">{JOURNEY_LABELS[journey] ?? journey}</td>
+                <td className="py-1.5 text-right">{r.total}</td>
+                <td className="py-1.5 text-right">{pct(r.containment_by_rule)}</td>
+                <td className="py-1.5 text-right text-neutral-400">{pct(r.containment_judged)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }

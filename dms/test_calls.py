@@ -43,3 +43,20 @@ def test_review_can_overturn_rule_containment(client):
     assert stats["containment_judged"] == 0.5
     assert stats["hallucination_rate"] == 0.5
     assert client.get("/calls", params={"unreviewed": True}, headers=REVIEW).json() == []
+
+
+def test_stats_split_by_journey(client):
+    find = {"tool": "find_appointment", "args": {}, "result": {"verified": True}}
+    avail = {"tool": "check_availability", "args": {}, "result": {"slots": []}}
+    client.post("/calls", json=_call("booked", tool_log=[avail]))
+    client.post("/calls", json=_call("transferred", transfer_reason="urgent_no_availability", tool_log=[avail]))
+    # A reschedule checks availability too, but it started from an existing appointment.
+    client.post("/calls", json=_call("booked", tool_log=[find, avail]))
+    client.post("/calls", json=_call("resolved_no_action"))
+    by_journey = client.get("/calls/stats").json()["by_journey"]
+    assert {j: (s["total"], s["containment_by_rule"]) for j, s in by_journey.items()} == {
+        "existing_appointment": (1, 1.0),
+        "new_booking": (2, 0.5),
+        "other": (1, 1.0),
+    }
+    assert {c["journey"] for c in client.get("/calls", headers=REVIEW).json()} == set(by_journey)

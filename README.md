@@ -78,6 +78,18 @@ judge can overturn a "resolved" call that it decides wasn't actually
 resolved. The dashboard shows both numbers side by side: containment by
 recorded outcome, and containment as judged.
 
+Containment is also split **by journey**: new booking, existing
+appointment (lookups, cancels, reschedules, step-up), and other. The DMS
+derives the journey from each call's tool log when it's read, so like the
+outcome it's decided by code, and older calls get one without a migration.
+
+[weekly_review.py](agent/weekly_review.py) is the weekly read. It prints
+containment per journey and per prompt version (the rollout comparison),
+then a **fix list**: every call that wasn't contained or that the judge
+flagged, grouped by journey and failure, with hallucinations first and then
+the biggest groups. Each entry carries the judge's reason and the call id
+to read before changing anything.
+
 Transcripts are stored with the booked name and every phone number
 redacted, and they can be read only with a separate `REVIEW_API_KEY`. The
 dashboard's key can see aggregate stats only (see limitations).
