@@ -422,7 +422,8 @@ def build_tool_schemas() -> list[FunctionSchema]:
                         "over: what the caller needs and what's already been "
                         "tried. Only what the caller said or a tool returned - "
                         "if they couldn't be understood, say exactly that "
-                        "rather than guessing what they wanted."
+                        "rather than guessing what they wanted. Never include "
+                        "a verification code, right or wrong."
                     ),
                 },
                 "vehicle": {
